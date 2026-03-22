@@ -2,184 +2,285 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>自适应拼图游戏</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>拼图小游戏</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; touch-action: manipulation; }
-        .controls { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        #puzzle-board { 
-            display: grid; gap: 2px; margin: 0 auto; background: #ccc; 
-            max-width: 90vw; max-height: 70vh; width: fit-content;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            touch-action: manipulation;
         }
-        .tile { 
-            background-size: cover; cursor: pointer; user-select: none;
-            box-sizing: border-box; border: 1px solid rgba(255,255,255,0.3);
-            transition: transform 0.1s;
+        h2 { margin: 10px 0 5px; }
+        .version { color: #666; margin-bottom: 20px; font-size: 14px; }
+        
+        .controls { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        
+        #puzzle-board {
+            display: grid;
+            margin: 0 auto;
+            gap: 2px;
+            background-color: #ccc;
+            border: 2px solid #333;
+            max-width: 90vw;
+            max-height: 70vh;
+            position: relative;
+            user-select: none;
         }
-        .tile.selected { border: 3px solid #ff4757; transform: scale(0.95); z-index: 10; }
-        .tile.locked { cursor: default; filter: grayscale(0.5); opacity: 0.9; border: none; }
-        .hidden { display: none; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #007bff; color: white; }
+
+        .tile {
+            background-repeat: no-repeat;
+            cursor: pointer;
+            box-sizing: border-box;
+            touch-action: none; /* 防止移动端拖拽时页面滚动 */
+        }
+
+        .tile.correct {
+            cursor: default;
+            outline: 2px solid #4CAF50;
+            z-index: 1;
+        }
+
+        .dragging {
+            opacity: 0.6;
+            transform: scale(1.05);
+            z-index: 100;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            min-height: 32px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
 
+    <h2>拼图小游戏</h2>
+    <div class="version">版本 1.3</div>
+
     <div class="controls">
         <input type="file" id="imageInput" accept="image/*">
-        <select id="difficulty">
-            <option value="3">3 x 3</option>
-            <option value="5">5 x 5</option>
-            <option value="8">8 x 8</option>
-        </select>
-        <button onclick="startGame()">开始游戏</button>
+        <div>
+            难度：
+            <select id="difficulty">
+                <option value="3">3x3</option>
+                <option value="5">5x5</option>
+                <option value="8">8x8</option>
+            </select>
+            <button id="startBtn">开始游戏</button>
+        </div>
     </div>
 
     <div id="puzzle-board"></div>
+    <div id="status"></div>
 
     <script>
-        let gridSize = 3;
-        let tiles = [];
-        let selectedTile = null;
-        let originalImg = new Image();
         const board = document.getElementById('puzzle-board');
+        const imageInput = document.getElementById('imageInput');
+        const difficultySelect = document.getElementById('difficulty');
+        const startBtn = document.getElementById('startBtn');
+        const statusDisplay = document.getElementById('status');
 
-        // 选择图片加载
-        document.getElementById('imageInput').onchange = function(e) {
+        let tiles = [];
+        let originalImage = new Image();
+        let gridSize = 3;
+        let dragSrcEl = null;
+
+        // 加载图片
+        imageInput.onchange = (e) => {
             const reader = new FileReader();
-            reader.onload = function(event) {
-                originalImg.src = event.target.result;
-            }
+            reader.onload = (event) => {
+                originalImage.src = event.target.result;
+            };
             reader.readAsDataURL(e.target.files[0]);
         };
 
+        startBtn.onclick = startGame;
+
         function startGame() {
-            if (!originalImg.src) return alert("请先选择一张图片！");
-            gridSize = parseInt(document.getElementById('difficulty').value);
-            initPuzzle();
+            if (!originalImage.src) {
+                alert("请先选择一张图片！");
+                return;
+            }
+            gridSize = parseInt(difficultySelect.value);
+            statusDisplay.innerText = "";
+            createPuzzle();
         }
 
-        function initPuzzle() {
-            board.innerHTML = '';
+        function createPuzzle() {
+            board.innerHTML = "";
             tiles = [];
-            const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7);
-            const tileSize = size / gridSize;
+            
+            // 计算拼图板的显示尺寸（保持原图比例）
+            const containerWidth = Math.min(window.innerWidth * 0.9, 500);
+            const ratio = originalImage.height / originalImage.width;
+            const boardWidth = containerWidth;
+            const boardHeight = containerWidth * ratio;
 
-            board.style.gridTemplateColumns = `repeat(${gridSize}, ${tileSize}px)`;
+            board.style.width = boardWidth + 'px';
+            board.style.height = boardHeight + 'px';
+            board.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
 
-            // 创建打乱的索引数组，排除已经在正确位置的可能性（可选，此处完全随机）
-            let indices = Array.from({length: gridSize * gridSize}, (_, i) => i);
-            indices = indices.sort(() => Math.random() - 0.5);
+            const tileWidth = boardWidth / gridSize;
+            const tileHeight = boardHeight / gridSize;
+
+            // 生成所有切片数据
+            let positions = [];
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                positions.push(i);
+            }
+
+            // 打乱顺序，但确保初始不在正确位置
+            let shuffled = [...positions].sort(() => Math.random() - 0.5);
 
             for (let i = 0; i < gridSize * gridSize; i++) {
-                const correctPos = i;
-                const currentPos = indices[i];
-                
                 const tile = document.createElement('div');
                 tile.className = 'tile';
-                tile.style.width = `${tileSize}px`;
-                tile.style.height = `${tileSize}px`;
+                const correctPos = i;
+                const currentPos = shuffled[i];
+
                 tile.dataset.correctIndex = correctPos;
-                tile.dataset.currentIndex = currentPos;
-
-                // 绘制切片
-                updateTileDisplay(tile, currentPos);
+                tile.dataset.currentIndex = i; // 当前在 DOM 中的顺序
+                tile.style.width = '100%';
+                tile.style.height = '100%';
                 
-                // 绑定事件（兼容点击和拖拽起点）
-                tile.addEventListener('mousedown', handleStart);
-                tile.addEventListener('touchstart', handleStart, {passive: false});
-                tile.addEventListener('mouseup', handleEnd);
-                tile.addEventListener('touchend', handleEnd);
+                // 设置背景图及偏移
+                tile.style.backgroundImage = `url(${originalImage.src})`;
+                tile.style.backgroundSize = `${boardWidth}px ${boardHeight}px`;
+                
+                updateTileDisplay(tile, currentPos, boardWidth, boardHeight);
 
+                // 绑定交互事件
+                addEvents(tile);
+                
                 tiles.push(tile);
+                board.appendChild(tile);
+                
+                // 初始检查（万一随机到了正确位置）
+                checkTileStatus(tile);
             }
-
-            // 渲染到DOM
-            tiles.forEach(t => board.appendChild(t));
-            checkWin(); // 检查初始状态是否有锁定的
         }
 
-        function updateTileDisplay(tile, imgIdx) {
+        function updateTileDisplay(tile, imgIdx, bW, bH) {
             const row = Math.floor(imgIdx / gridSize);
             const col = imgIdx % gridSize;
-            const percent = 100 / (gridSize - 1);
-            
-            tile.style.backgroundImage = `url(${originalImg.src})`;
-            tile.style.backgroundSize = `${gridSize * 100}% ${gridSize * 100}%`;
-            tile.style.backgroundPosition = `${col * percent}% ${row * percent}%`;
-            
-            // 锁定逻辑
-            if (parseInt(tile.dataset.correctIndex) === imgIdx) {
-                tile.classList.add('locked');
-            } else {
-                tile.classList.remove('locked');
-            }
+            const x = (col * 100) / (gridSize - 1);
+            const y = (row * 100) / (gridSize - 1);
+            // 存储当前显示的图片索引
+            tile.dataset.currentImgIdx = imgIdx;
+            tile.style.backgroundPosition = `${x}% ${y}%`;
         }
 
-        let startX, startY;
+        function addEvents(tile) {
+            // 触摸/鼠标 拖拽交换逻辑
+            tile.draggable = true;
 
-        function handleStart(e) {
-            e.preventDefault();
-            const tile = e.currentTarget;
-            if (tile.classList.contains('locked')) return;
+            tile.addEventListener('dragstart', handleDragStart);
+            tile.addEventListener('dragover', handleDragOver);
+            tile.addEventListener('drop', handleDrop);
+            tile.addEventListener('dragend', handleDragEnd);
 
-            if (!selectedTile) {
-                // 第一步：选中
-                selectedTile = tile;
-                tile.classList.add('selected');
-                const touch = e.touches ? e.touches[0] : e;
-                startX = touch.clientX;
-                startY = touch.clientY;
-            } else {
-                // 第二步：点击交换（针对第二种操作方式）
-                swapTiles(selectedTile, tile);
-            }
+            // 移动端兼容
+            tile.addEventListener('touchstart', handleTouchStart, {passive: false});
+            tile.addEventListener('touchmove', handleTouchMove, {passive: false});
+            tile.addEventListener('touchend', handleTouchEnd);
         }
 
-        function handleEnd(e) {
-            if (!selectedTile) return;
-            
-            const touch = e.changedTouches ? e.changedTouches[0] : e;
-            const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+        // --- 拖拽逻辑 ---
 
-            // 第一种操作方式：如果是拖动到另一个tile上
-            if (targetEl && targetEl.classList.contains('tile') && targetEl !== selectedTile) {
-                if (!targetEl.classList.contains('locked')) {
-                    swapTiles(selectedTile, targetEl);
-                    return;
-                }
+        function handleDragStart(e) {
+            if (this.classList.contains('correct')) {
+                e.preventDefault();
+                return;
             }
-            
-            // 如果是原地点击，保留选中状态等待第二次点击
-            const dist = Math.hypot(touch.clientX - startX, touch.clientY - startY);
-            if (dist > 10) { // 明显的拖动动作但没点到目标
-                selectedTile.classList.remove('selected');
-                selectedTile = null;
-            }
+            dragSrcEl = this;
+            this.classList.add('dragging');
         }
 
-        function swapTiles(tile1, tile2) {
-            const idx1 = tile1.dataset.currentIndex;
-            const idx2 = tile2.dataset.currentIndex;
+        function handleDragOver(e) {
+            if (e.preventDefault) e.preventDefault();
+            return false;
+        }
 
-            // 交换索引数据
-            tile1.dataset.currentIndex = idx2;
-            tile2.dataset.currentIndex = idx1;
+        function handleDrop(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            if (dragSrcEl !== this && !this.classList.contains('correct')) {
+                swapTiles(dragSrcEl, this);
+            }
+            return false;
+        }
 
-            // 更新显示
-            updateTileDisplay(tile1, parseInt(idx2));
-            updateTileDisplay(tile2, parseInt(idx1));
-
-            // 清除选中
-            tile1.classList.remove('selected');
-            selectedTile = null;
-
+        function handleDragEnd() {
+            this.classList.remove('dragging');
             checkWin();
         }
 
+        // --- 移动端模拟拖拽 ---
+        let touchTarget = null;
+
+        function handleTouchStart(e) {
+            if (this.classList.contains('correct')) return;
+            dragSrcEl = this;
+            this.classList.add('dragging');
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault(); // 禁止滚动
+            const touch = e.touches[0];
+            touchTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+        }
+
+        function handleTouchEnd(e) {
+            this.classList.remove('dragging');
+            if (touchTarget && touchTarget.classList.contains('tile') && 
+                touchTarget !== dragSrcEl && !touchTarget.classList.contains('correct')) {
+                swapTiles(dragSrcEl, touchTarget);
+                checkWin();
+            }
+            touchTarget = null;
+        }
+
+        function swapTiles(tile1, tile2) {
+            const tempImgIdx = tile1.dataset.currentImgIdx;
+            const tempBgPos = tile1.style.backgroundPosition;
+
+            tile1.dataset.currentImgIdx = tile2.dataset.currentImgIdx;
+            tile1.style.backgroundPosition = tile2.style.backgroundPosition;
+
+            tile2.dataset.currentImgIdx = tempImgIdx;
+            tile2.style.backgroundPosition = tempBgPos;
+
+            checkTileStatus(tile1);
+            checkTileStatus(tile2);
+        }
+
+        function checkTileStatus(tile) {
+            if (tile.dataset.currentImgIdx == tile.dataset.correctIndex) {
+                tile.classList.add('correct');
+                tile.draggable = false;
+            }
+        }
+
         function checkWin() {
-            const allLocked = Array.from(document.querySelectorAll('.tile')).every(t => t.classList.contains('locked'));
-            if (allLocked && tiles.length > 0) {
-                setTimeout(() => alert("太棒了！拼图完成！"), 100);
+            const allCorrect = Array.from(document.querySelectorAll('.tile'))
+                                    .every(t => t.classList.contains('correct'));
+            if (allCorrect) {
+                statusDisplay.innerText = "🎉 拼图成功！";
             }
         }
     </script>
