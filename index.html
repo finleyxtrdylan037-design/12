@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>自定义图片拼图</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color: #f5f7fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            touch-action: manipulation;
+        }
+
+        h2 { color: #333; margin-bottom: 10px; }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        #game-board {
+            position: relative;
+            background: #ddd;
+            border: 2px solid #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: none; /* 初始隐藏 */
+        }
+
+        .tile {
+            position: absolute;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: grab;
+            transition: transform 0.1s ease;
+            touch-action: none; /* 禁止浏览器默认滚动，方便拖拽 */
+        }
+
+        .tile.locked {
+            cursor: default;
+            border: none;
+            z-index: 1;
+        }
+
+        .tile.dragging {
+            z-index: 100;
+            opacity: 0.8;
+            transform: scale(1.05);
+            cursor: grabbing;
+        }
+
+        button, input[type="file"] {
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+        }
+
+        select { padding: 10px; border-radius: 5px; }
+
+        #message {
+            margin-top: 15px;
+            font-weight: bold;
+            color: #27ae60;
+            height: 24px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>拼图小游戏</h2>
+
+    <div class="controls">
+        <input type="file" id="imageInput" accept="image/*">
+        <select id="difficulty">
+            <option value="3">3 x 3</option>
+            <option value="5">5 x 5</option>
+            <option value="8">8 x 8</option>
+        </select>
+        <button onclick="startGame()">开始游戏</button>
+    </div>
+
+    <div id="game-board"></div>
+    <div id="message"></div>
+
+    <script>
+        let gridSize = 3;
+        let tiles = [];
+        let image = new Image();
+        let board = document.getElementById('game-board');
+        let boardSize = Math.min(window.innerWidth - 40, 500); // 响应式大小
+
+        const imageInput = document.getElementById('imageInput');
+        const difficultySelect = document.getElementById('difficulty');
+
+        // 初始化：读取图片
+        imageInput.onchange = function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                image.src = event.target.result;
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        function startGame() {
+            if (!image.src) {
+                alert("请先选择一张图片！");
+                return;
+            }
+            gridSize = parseInt(difficultySelect.value);
+            renderBoard();
+        }
+
+        function renderBoard() {
+            board.innerHTML = '';
+            board.style.display = 'block';
+            board.style.width = boardSize + 'px';
+            board.style.height = boardSize + 'px';
+            document.getElementById('message').innerText = '';
+
+            const tileSize = boardSize / gridSize;
+            tiles = [];
+
+            // 生成随机打乱的位置索引
+            let indices = Array.from({length: gridSize * gridSize}, (_, i) => i);
+            indices.sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const correctX = (i % gridSize) * tileSize;
+                const correctY = Math.floor(i / gridSize) * tileSize;
+
+                const tile = document.createElement('div');
+                tile.classList.add('tile');
+                tile.style.width = tileSize + 'px';
+                tile.style.height = tileSize + 'px';
+                
+                // 背景设置（保持原图比例裁剪）
+                tile.style.backgroundImage = `url(${image.src})`;
+                tile.style.backgroundSize = `${boardSize}px ${boardSize}px`;
+                tile.style.backgroundPosition = `-${correctX}px -${correctY}px`;
+
+                // 初始随机位置
+                const randomIndex = indices[i];
+                const currentX = (randomIndex % gridSize) * tileSize;
+                const currentY = Math.floor(randomIndex / gridSize) * tileSize;
+
+                tile.dataset.correctX = correctX;
+                tile.dataset.correctY = correctY;
+                tile.style.left = currentX + 'px';
+                tile.style.top = currentY + 'px';
+
+                // 如果随机位置刚好正确，直接锁定
+                if (Math.abs(currentX - correctX) < 1 && Math.abs(currentY - correctY) < 1) {
+                    lockTile(tile);
+                } else {
+                    addDragListeners(tile);
+                }
+
+                board.appendChild(tile);
+                tiles.push(tile);
+            }
+        }
+
+        function addDragListeners(tile) {
+            let startX, startY, initialLeft, initialTop;
+
+            const onStart = (e) => {
+                if (tile.classList.contains('locked')) return;
+                const touch = e.type === 'touchstart' ? e.touches[0] : e;
+                startX = touch.clientX;
+                startY = touch.clientY;
+                initialLeft = parseFloat(tile.style.left);
+                initialTop = parseFloat(tile.style.top);
+                tile.classList.add('dragging');
+                
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onEnd);
+                document.addEventListener('touchmove', onMove, { passive: false });
+                document.addEventListener('touchend', onEnd);
+            };
+
+            const onMove = (e) => {
+                e.preventDefault();
+                const touch = e.type === 'touchmove' ? e.touches[0] : e;
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                tile.style.left = (initialLeft + dx) + 'px';
+                tile.style.top = (initialTop + dy) + 'px';
+            };
+
+            const onEnd = () => {
+                tile.classList.remove('dragging');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onEnd);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onEnd);
+
+                checkPosition(tile);
+            };
+
+            tile.addEventListener('mousedown', onStart);
+            tile.addEventListener('touchstart', onStart);
+        }
+
+        function checkPosition(tile) {
+            const tileSize = boardSize / gridSize;
+            const currentX = parseFloat(tile.style.left);
+            const currentY = parseFloat(tile.style.top);
+            const correctX = parseFloat(tile.dataset.correctX);
+            const correctY = parseFloat(tile.dataset.correctY);
+
+            // 容错距离：如果距离目标点小于 Tile 的 20%，则认为正确
+            const threshold = tileSize * 0.2;
+
+            if (Math.abs(currentX - correctX) < threshold && Math.abs(currentY - correctY) < threshold) {
+                tile.style.left = correctX + 'px';
+                tile.style.top = correctY + 'px';
+                lockTile(tile);
+                checkWin();
+            }
+        }
+
+        function lockTile(tile) {
+            tile.classList.add('locked');
+            // 移除所有事件监听
+            const newTile = tile.cloneNode(true);
+            tile.parentNode.replaceChild(newTile, tile);
+        }
+
+        function checkWin() {
+            const lockedCount = document.querySelectorAll('.tile.locked').length;
+            if (lockedCount === gridSize * gridSize) {
+                document.getElementById('message').innerText = "🎉 恭喜你，拼图完成了！";
+            }
+        }
+
+        // 窗口缩放适配
+        window.onresize = () => {
+            let newBoardSize = Math.min(window.innerWidth - 40, 500);
+            if(Math.abs(newBoardSize - boardSize) > 50) {
+                boardSize = newBoardSize;
+                if(image.src) startGame();
+            }
+        };
+    </script>
+</body>
+</html>
