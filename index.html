@@ -3,493 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>九宫格拼图小游戏</title>
+    <title>智能自适应拼图</title>
     <style>
-        :root {
-            --primary-color: #4a90e2;
-            --bg-color: #f4f4f9;
-            --text-color: #333;
-            --border-color: #ccc;
+        :root { --primary: #4a90e2; --bg: #f5f7fa; }
+        body { font-family: sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; touch-action: manipulation; }
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        #game-board { 
+            display: grid; gap: 2px; background: #ccc; border: 4px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: relative; max-width: 95vw; max-height: 70vh;
         }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            user-select: none; /* 防止触摸时选择文本 */
-            -webkit-user-select: none;
+        .tile { 
+            background-repeat: no-repeat; cursor: grab; 
+            transition: transform 0.2s, box-shadow 0.2s; touch-action: none;
         }
-
-        h1 { margin-bottom: 10px; font-size: 1.5rem; }
-
-        .controls {
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
-            max-width: 500px;
-        }
-
-        button, label {
-            background-color: white;
-            border: 1px solid var(--border-color);
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        button:hover, label:hover {
-            background-color: #e6e6e6;
-        }
-
-        button.active {
-            background-color: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        #file-name {
-            font-size: 12px;
-            color: #666;
-            width: 100%;
-            text-align: center;
-            margin-top: -5px;
-            margin-bottom: 10px;
-        }
-
-        /* 游戏区域主容器 */
-        #game-container {
-            position: relative;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            background: white;
-            border: 2px solid var(--border-color);
-            /* 初始大小 */
-            width: 90vw; 
-            height: 90vw;
-            max-width: 500px;
-            max-height: 500px;
-            overflow: hidden;
-            display: none; /* 初始隐藏 */
-        }
-
-        /* 拼图块 */
-        .puzzle-piece {
-            position: absolute;
-            box-sizing: border-box;
-            border: 1px solid rgba(255,255,255,0.3); /* 轻微边框区分 */
-            background-repeat: no-repeat;
-            cursor: grab;
-            touch-action: none; /* 禁用浏览器默认触摸行为(如滚动) */
-            transition: box-shadow 0.2s;
-            z-index: 1;
-        }
-
-        /* 拖动时的样式 */
-        .puzzle-piece.dragging {
-            opacity: 0.8;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            cursor: grabbing;
-            z-index: 10; /* 确保在最上层 */
-            transition: none; /* 拖动时禁用过渡 */
-        }
-
-        /* 锁定（位置正确）的样式 */
-        .puzzle-piece.locked {
-            cursor: default;
-            border: none; /* 正确后隐藏边框 */
-            z-index: 0;
-            transition: all 0.2s ease-out;
-        }
-
-        #status {
-            margin-top: 15px;
-            font-weight: bold;
-            color: var(--primary-color);
-            height: 1.2em;
-        }
-
-        /* 适配移动端 */
-        @media (max-width: 600px) {
-            padding: 10px;
-            .controls { gap: 5px; }
-            button, label { padding: 6px 12px; font-size: 12px; }
-        }
+        .tile.locked { cursor: default; filter: brightness(1.05); border: 1px solid rgba(255,255,255,0.3); }
+        .tile.dragging { z-index: 10; opacity: 0.8; transform: scale(1.05); cursor: grabbing; }
+        button, select { padding: 10px 15px; border-radius: 8px; border: none; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; }
+        .success-msg { color: #2ecc71; font-weight: bold; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
 
-    <h1>拼图小游戏</h1>
+    <h2>🧩 智能拼图</h2>
 
     <div class="controls">
-        <label for="image-input">选择图片 (手机/电脑)</label>
-        <input type="file" id="image-input" accept="image/*">
-        
-        <button onclick="setGrid(3, this)" class="active">3x3</button>
-        <button onclick="setGrid(5, this)">5x5</button>
-        <button onclick="setGrid(8, this)">8x8</button>
-        
-        <button onclick="startGame()" style="background-color: #2ecc71; color: white; border:none;">打乱开始</button>
+        <input type="file" id="imageInput" accept="image/*" style="display:none">
+        <button onclick="document.getElementById('imageInput').click()">选择图片</button>
+        <select id="difficulty">
+            <option value="3">3 x 3</option>
+            <option value="5">5 x 5</option>
+            <option value="8">8 x 8</option>
+        </select>
+        <button onclick="startGame()" style="background: var(--primary); color: white;">开始游戏</button>
     </div>
-    <div id="file-name">未选择图片</div>
 
-    <div id="game-container"></div>
+    <div id="game-board"></div>
+    <div id="success" class="success-msg">恭喜！拼图完成！ 🎉</div>
 
-    <div id="status"></div>
+<script>
+    let gridSize = 3;
+    let tiles = [];
+    let originalImage = null;
+    const board = document.getElementById('game-board');
+    const imageInput = document.getElementById('imageInput');
 
-    <script>
-        // 全局变量保存游戏状态
-        const state = {
-            gridSize: 3,        // 默认 3x3
-            originalImage: null,// 保存加载的 Image 对象
-            pieces: [],         // 保存所有拼图块 DOM 元素和数据
-            containerSize: 0,   // 画布的实际像素尺寸
-            pieceSize: 0,       // 每个小块的像素尺寸
-            isGameRunning: false
+    // 监听图片上传
+    imageInput.addEventListener('change', function(e) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                originalImage = img;
+                startGame();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    function startGame() {
+        if (!originalImage) {
+            alert("请先选择一张图片！");
+            return;
+        }
+        gridSize = parseInt(document.getElementById('difficulty').value);
+        document.getElementById('success').style.display = 'none';
+        initBoard();
+    }
+
+    function initBoard() {
+        board.innerHTML = '';
+        tiles = [];
+        
+        // 计算适配屏幕的尺寸，保持原图比例
+        const screenW = window.innerWidth * 0.9;
+        const screenH = window.innerHeight * 0.6;
+        const imgRatio = originalImage.width / originalImage.height;
+        
+        let boardW, boardH;
+        if (imgRatio > screenW / screenH) {
+            boardW = screenW;
+            boardH = screenW / imgRatio;
+        } else {
+            boardH = screenH;
+            boardW = screenH * imgRatio;
+        }
+
+        board.style.width = `${boardW}px`;
+        board.style.height = `${boardH}px`;
+        board.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+
+        const tileW = boardW / gridSize;
+        const tileH = boardH / gridSize;
+
+        // 生成正确位置索引
+        let indices = Array.from({length: gridSize * gridSize}, (_, i) => i);
+        // 随机打乱
+        let shuffled = [...indices].sort(() => Math.random() - 0.5);
+
+        shuffled.forEach((posIndex, currentIndex) => {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.dataset.correctPos = posIndex; // 应该是哪个图
+            tile.dataset.currentPos = currentIndex; // 现在在哪
+            
+            // 设置背景图及偏移
+            const row = Math.floor(posIndex / gridSize);
+            const col = posIndex % gridSize;
+            
+            tile.style.backgroundImage = `url(${originalImage.src})`;
+            tile.style.backgroundSize = `${boardW}px ${boardH}px`;
+            tile.style.backgroundPosition = `-${col * tileW}px -${row * tileH}px`;
+            
+            // 初始检查是否已经在正确位置
+            if (posIndex === currentIndex) {
+                tile.classList.add('locked');
+            } else {
+                addDragEvents(tile);
+            }
+
+            tiles.push(tile);
+            board.appendChild(tile);
+        });
+    }
+
+    let draggedTile = null;
+
+    function addDragEvents(tile) {
+        // 鼠标与触摸统一处理
+        tile.onpointerdown = (e) => {
+            if (tile.classList.contains('locked')) return;
+            draggedTile = tile;
+            tile.classList.add('dragging');
+            tile.setPointerCapture(e.pointerId);
         };
 
-        const container = document.getElementById('game-container');
-        const fileInput = document.getElementById('image-input');
-        const fileNameSpan = document.getElementById('file-name');
-        const statusSpan = document.getElementById('status');
-
-        // 初始化：监听图片上传
-        fileInput.addEventListener('change', handleFileSelect);
-
-        // 窗口大小改变时重新计算 (响应式)
-        window.addEventListener('resize', handleResize);
-
-        // --- 1. 处理图片输入和保持比例 ---
-
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            fileNameSpan.textContent = file.name;
-            statusSpan.textContent = "正在加载图片...";
+        tile.onpointerup = (e) => {
+            if (!draggedTile) return;
+            tile.classList.remove('dragging');
             
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = function() {
-                    state.originalImage = img;
-                    statusSpan.textContent = "图片已加载，点击“打乱开始”";
-                    container.style.display = 'block';
-                    initGameDisplay(); // 初始化显示（不打乱）
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+            // 获取松开手位置的元素
+            const target = document.elementFromPoint(e.clientX, e.clientY);
+            const dropTarget = target ? target.closest('.tile') : null;
 
-        // 调整大小时重新初始化显示
-        let resizeTimer;
-        function handleResize() {
-            if (!state.originalImage) return;
-            clearTimeout(resizeTimer);
-            // 防抖，避免频繁重绘
-            resizeTimer = setTimeout(() => {
-                initGameDisplay();
-            }, 200);
-        }
-
-        // 设置难度
-        function setGrid(size, btn) {
-            state.gridSize = size;
-            // 更新按钮样式
-            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            if (dropTarget && dropTarget !== draggedTile && !dropTarget.classList.contains('locked')) {
+                swapTiles(draggedTile, dropTarget);
+            }
             
-            if (state.originalImage) {
-                initGameDisplay();
+            draggedTile = null;
+            checkWin();
+        };
+    }
+
+    function swapTiles(t1, t2) {
+        // 交换 DOM 中的内容（样式和正确位置标记）
+        const bg1 = t1.style.backgroundPosition;
+        const cp1 = t1.dataset.correctPos;
+        
+        t1.style.backgroundPosition = t2.style.backgroundPosition;
+        t1.dataset.correctPos = t2.dataset.correctPos;
+        
+        t2.style.backgroundPosition = bg1;
+        t2.dataset.correctPos = cp1;
+
+        // 交换后检查锁定状态
+        [t1, t2].forEach(t => {
+            if (t.dataset.correctPos == t.dataset.currentPos) {
+                t.classList.add('locked');
+                t.onpointerdown = null; // 禁止再动
             }
+        });
+    }
+
+    function checkWin() {
+        const allLocked = Array.from(document.querySelectorAll('.tile')).every(t => t.classList.contains('locked'));
+        if (allLocked) {
+            document.getElementById('success').style.display = 'block';
         }
+    }
 
-        // --- 2. 核心逻辑：切分图片和生成格子 ---
-
-        // 初始化显示（按照正确顺序排列，展示给用户看）
-        function initGameDisplay(shuffle = false) {
-            if (!state.originalImage) return;
-
-            state.isGameRunning = false;
-            statusSpan.textContent = "";
-
-            // 1. 计算容器大小（保持正方形，适配屏幕）
-            const maxW = Math.min(window.innerWidth * 0.9, 500);
-            state.containerSize = maxW;
-            container.style.width = maxW + 'px';
-            container.style.height = maxW + 'px';
-
-            // 2. 计算每个小块大小
-            state.pieceSize = state.containerSize / state.gridSize;
-
-            // 3. 清空容器
-            container.innerHTML = '';
-            state.pieces = [];
-
-            const img = state.originalImage;
-            
-            // 4. 计算 Canvas 绘制图片时的切片参数，以保持原图比例居中裁剪
-            // 我们希望在 Canvas 中画出一个正方形的图，这个正方形取自原图中心
-            let sSize, sx, sy;
-            if (img.width > img.height) {
-                sSize = img.height;
-                sx = (img.width - img.height) / 2;
-                sy = 0;
-            } else {
-                sSize = img.width;
-                sx = 0;
-                sy = (img.height - img.width) / 2;
-            }
-
-            // 5. 生成切片数据
-            const size = state.gridSize;
-            const pieceDataArray = [];
-
-            for (let r = 0; r < size; r++) {
-                for (let c = 0; c < size; c++) {
-                    // 创建 canvas 切图
-                    const canvas = document.createElement('canvas');
-                    canvas.width = state.pieceSize;
-                    canvas.height = state.pieceSize;
-                    const ctx = canvas.getContext('2d');
-
-                    // 计算原图中这一块的坐标
-                    // 这里的比例是基于上面计算的居中正方形 sSize
-                    const sourceSSize = sSize / size;
-                    const sourceSX = sx + c * sourceSSize;
-                    const sourceSY = sy + r * sourceSSize;
-
-                    // 绘制图片的一部分到 canvas
-                    ctx.drawImage(
-                        img, 
-                        sourceSX, sourceSY, sourceSSize, sourceSSize, // 源图位置和大小
-                        0, 0, state.pieceSize, state.pieceSize // 目标位置和大小
-                    );
-
-                    pieceDataArray.push({
-                        correctR: r,
-                        correctC: c,
-                        dataUrl: canvas.toDataURL()
-                    });
-                }
-            }
-
-            // 6. 创建 DOM 元素并放入容器
-            if (shuffle) {
-                // 如果是开始游戏，打乱顺序
-                shuffleArray(pieceDataArray);
-            }
-
-            pieceDataArray.forEach((data, index) => {
-                const el = document.createElement('div');
-                el.className = 'puzzle-piece';
-                el.style.width = state.pieceSize + 'px';
-                el.style.height = state.pieceSize + 'px';
-                el.style.backgroundImage = `url(${data.dataUrl})`;
-                el.style.backgroundSize = 'cover';
-
-                // 保存正确位置和当前格子位置信息
-                el.dataset.correctR = data.correctR;
-                el.dataset.correctC = data.correctC;
-                
-                // 初始平铺位置 (如果是 shuffle 后，index 已经是随机的了)
-                // 计算当前应该在哪个格子
-                const currentR = Math.floor(index / size);
-                const currentC = index % size;
-                
-                // 设置绝对定位坐标
-                const posX = currentC * state.pieceSize;
-                const posY = currentR * state.pieceSize;
-                el.style.left = posX + 'px';
-                el.style.top = posY + 'px';
-
-                // 绑定拖拽事件（包含鼠标和触摸）
-                addDragListeners(el);
-
-                container.appendChild(el);
-                state.pieces.push(el);
-                
-                // 初始化时检查一次，如果刚好在正确位置则锁定 (虽然初始化很少见，但为了逻辑严密)
-                if (shuffle) {
-                     checkAndLock(el, posX, posY);
-                }
-            });
-
-            if (shuffle) {
-                state.isGameRunning = true;
-                statusSpan.textContent = "游戏开始！拖动碎片到正确位置。";
-                checkWin(); // 检查是否刚打乱就赢了(运气极好)
-            }
-        }
-
-        // 开始游戏按钮
-        function startGame() {
-            if (!state.originalImage) {
-                alert("请先选择一张图片");
-                return;
-            }
-            initGameDisplay(true); // 传入 true 表示需要打乱
-        }
-
-        // 洗牌算法
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-
-        // --- 3. 拖拽逻辑 (兼容 PC 和 移动端) ---
-
-        function addDragListeners(el) {
-            // 使用 Pointer Events API，统一处理鼠标和触摸
-            el.addEventListener('pointerdown', onPointerDown);
-        }
-
-        let dragInfo = null;
-
-        function onPointerDown(e) {
-            if (!state.isGameRunning) return;
-            const el = e.currentTarget;
-            
-            // 如果已经被锁定，不能移动
-            if (el.classList.contains('locked')) return;
-
-            // 阻止默认行为（防止 iOS 页面滚动）
-            if(e.cancelable) e.preventDefault();
-
-            el.setPointerCapture(e.pointerId); // 捕获指针，移出元素也能响应
-            el.classList.add('dragging');
-
-            const rect = el.getBoundingClientRect();
-            // 记录点击位置相对于元素左上角的偏移量
-            dragInfo = {
-                target: el,
-                pointerId: e.pointerId,
-                startX: el.offsetLeft,
-                startY: el.offsetTop,
-                clientX: e.clientX,
-                clientY: e.clientY
-            };
-
-            el.addEventListener('pointermove', onPointerMove);
-            el.addEventListener('pointerup', onPointerUp);
-            el.addEventListener('pointercancel', onPointerUp); // 处理异常中断
-        }
-
-        function onPointerMove(e) {
-            if (!dragInfo || dragInfo.pointerId !== e.pointerId) return;
-            const el = dragInfo.target;
-
-            const dx = e.clientX - dragInfo.clientX;
-            const dy = e.clientY - dragInfo.clientY;
-
-            let newX = dragInfo.startX + dx;
-            let newY = dragInfo.startY + dy;
-
-            // 边界限制，不让滑出容器
-            const maxPos = state.containerSize - state.pieceSize;
-            newX = Math.max(0, Math.min(newX, maxPos));
-            newY = Math.max(0, Math.min(newY, maxPos));
-
-            el.style.left = newX + 'px';
-            el.style.top = newY + 'px';
-        }
-
-        function onPointerUp(e) {
-            if (!dragInfo || dragInfo.pointerId !== e.pointerId) return;
-            const el = dragInfo.target;
-
-            el.classList.remove('dragging');
-            el.releasePointerCapture(e.pointerId);
-            
-            el.removeEventListener('pointermove', onPointerMove);
-            el.removeEventListener('pointerup', onPointerUp);
-            el.removeEventListener('pointercancel', onPointerUp);
-
-            // --- 核心逻辑：吸附到格子 ---
-            const currentX = parseFloat(el.style.left);
-            const currentY = parseFloat(el.style.top);
-
-            // 计算最近的格子坐标
-            const pSize = state.pieceSize;
-            let targetC = Math.round(currentX / pSize);
-            let targetR = Math.round(currentY / pSize);
-
-            // 计算吸附后的最终像素位置
-            const finalX = targetC * pSize;
-            const finalY = targetR * pSize;
-
-            // 应用吸附动画（CSS transition 处理）
-            el.style.transition = 'all 0.2s ease-out';
-            el.style.left = finalX + 'px';
-            el.style.top = finalY + 'px';
-
-            // 监听动画结束，检查是否正确并锁定
-            // 使用 once: true 确保只执行一次
-            el.addEventListener('transitionend', function() {
-                el.style.transition = ''; // 清除临时过渡
-                checkAndLock(el, finalX, finalY);
-                checkWin();
-            }, { once: true });
-
-            dragInfo = null;
-        }
-
-        // --- 4. 检查正确位置并锁定 ---
-
-        function checkAndLock(el, currentX, currentY) {
-            const pSize = state.pieceSize;
-            
-            // 当前所在格子
-            const currentC = Math.round(currentX / pSize);
-            const currentR = Math.round(currentY / pSize);
-            
-            // 目标正确格子
-            const correctC = parseInt(el.dataset.correctC);
-            const correctR = parseInt(el.dataset.correctR);
-
-            // 判断是否到达正确位置
-            if (currentC === correctC && currentR === correctR) {
-                // 添加锁定样式
-                el.classList.add('locked');
-                // 确保它完全对齐
-                el.style.left = correctC * pSize + 'px';
-                el.style.top = correctR * pSize + 'px';
-            }
-        }
-
-        // 检查是否所有都在正确位置
-        function checkWin() {
-            if (!state.isGameRunning) return;
-
-            const totalPieces = state.gridSize * state.gridSize;
-            const lockedPieces = container.querySelectorAll('.puzzle-piece.locked').length;
-
-            if (lockedPieces === totalPieces) {
-                state.isGameRunning = false;
-                statusSpan.textContent = "🎉 恭喜！你完成了拼图！";
-                // 移除所有碎片的边框，看起来就像原图一样
-                state.pieces.forEach(p => p.style.border = 'none');
-            } else {
-                statusSpan.textContent = `进度: ${lockedPieces} / ${totalPieces}`;
-            }
-        }
-
-    </script>
+    // 窗口大小改变时重绘
+    window.onresize = () => { if(originalImage) startGame(); };
+</script>
 </body>
 </html>
