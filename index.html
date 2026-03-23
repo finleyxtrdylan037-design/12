@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>拼图小游戏 v2.2 智能边框高清版</title>
+    <title>拼图小游戏 v2.3 关卡联动版</title>
     <style>
         :root {
             --primary: #007aff;
             --success: #1d7a2a;
             --bg: #f5f5f7;
             --white: #ffffff;
-            --footer-h: 80px;
+            --row-h: 34px;
         }
 
-        /* 视口锁定：100dvh 解决移动端工具栏遮挡 */
+        /* 视口锁定：100dvh 解决动态工具栏问题 */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
         body, html {
             margin: 0; padding: 0;
             width: 100%; height: 100dvh; 
@@ -25,112 +24,95 @@
             touch-action: none; 
         }
 
-        .app-wrapper {
+        .app-container {
             display: flex;
             flex-direction: column;
-            width: 100%;
-            height: 100dvh;
-            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+            width: 100%; height: 100dvh;
+            padding: env(safe-area-inset-top) 5px env(safe-area-inset-bottom) 5px;
         }
 
-        /* 顶部 UI 区 */
-        #header-ui {
-            flex-shrink: 0;
-            padding: 10px 5px;
-            text-align: center;
-            z-index: 10;
+        /* 顶部 UI 管理：强制压缩至三行内 */
+        #header-ui { flex-shrink: 0; padding-top: 5px; }
+        .ui-row { 
+            display: flex; align-items: center; justify-content: space-between; 
+            height: var(--row-h); margin-bottom: 4px; gap: 5px;
         }
-        h2 { margin: 0 0 10px; font-size: 1.2rem; color: #333; }
+        .title { font-size: 0.9rem; font-weight: bold; color: #333; }
+        .lvl-info { font-size: 0.85rem; color: var(--primary); font-weight: bold; }
 
-        .control-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-        
         button, select {
-            padding: 8px 16px; font-size: 14px; border-radius: 10px;
+            padding: 4px 10px; font-size: 13px; border-radius: 6px;
             border: 1px solid #d1d1d6; background: var(--white); cursor: pointer;
-            transition: transform 0.1s;
+            white-space: nowrap;
         }
-        button:active { transform: scale(0.95); background: #f2f2f7; }
-        
-        #origin-btn { display: none; background: var(--primary); color: white; border: none; }
+        button:active { background: #f2f2f7; opacity: 0.8; }
+        #btn-origin { background: var(--primary); color: white; border: none; visibility: hidden; }
 
-        /* 中部核心游戏区：动态挤压算法 */
-        #game-zone {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-            min-height: 0; 
-            overflow: hidden;
+        /* 中部游戏区：动态挤压逻辑 */
+        #game-area {
+            flex: 1; display: flex; justify-content: center; align-items: center;
+            min-height: 0; overflow: hidden; padding: 5px;
         }
-
-        /* Canvas 高清显示设置 */
         canvas {
             background-color: #fff;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
             display: block;
             image-rendering: -webkit-optimize-contrast;
         }
 
-        /* 底部成功区：固定高度 */
+        /* 底部成功区：固定 80px */
         #footer-ui {
-            height: var(--footer-h);
-            flex-shrink: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
+            height: 80px; flex-shrink: 0;
+            display: flex; justify-content: center; align-items: center;
         }
-
         #success-msg {
-            font-size: 32px;
-            font-weight: bold;
-            color: var(--success);
-            opacity: 0;
-            transform: translateY(20px);
+            font-size: 32px; font-weight: bold; color: var(--success);
+            opacity: 0; transform: translateY(15px);
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none;
         }
-        #success-msg.visible { opacity: 1; transform: translateY(0); }
+        #success-msg.show { opacity: 1; transform: translateY(0); }
 
-        /* 预览遮罩 */
+        /* 原图预览遮罩 */
         #modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 1000;
             justify-content: center; align-items: center;
         }
-        #modal img { max-width: 90%; max-height: 85%; object-fit: contain; border: 2px solid #fff; }
+        #modal img { max-width: 90%; max-height: 80%; border: 2px solid #fff; }
         #close-modal {
-            position: absolute; top: 40px; right: 30px;
-            width: 44px; height: 44px; background: #fff; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 24px; color: #000; font-weight: bold; cursor: pointer;
+            position: absolute; top: 30px; right: 20px;
+            width: 36px; height: 36px; background: #fff; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-<div class="app-wrapper">
+<div class="app-container">
     <div id="header-ui">
-        <h2>拼图小游戏，版本 2.2</h2>
-        <div class="control-row">
-            <input type="file" id="img-loader" accept="image/*" style="display:none">
-            <button onclick="document.getElementById('img-loader').click()">选择图片</button>
-            <button id="origin-btn" onclick="toggleModal(true)">显示原图</button>
+        <div class="ui-row">
+            <span class="title">拼图 v2.3</span>
+            <span id="level-display" class="lvl-info">第 1/10 关</span>
+            <button onclick="document.getElementById('file-in').click()">本地图片</button>
+            <input type="file" id="file-in" accept="image/*" style="display:none">
         </div>
-        <div class="control-row">
-            <select id="diff-level">
+        <div class="ui-row" style="justify-content: center; gap: 15px;">
+            <button id="btn-origin" onclick="toggleModal(true)">显示原图</button>
+            <button id="btn-next" onclick="nextLevel()">下一关</button>
+        </div>
+        <div class="ui-row" style="justify-content: center; gap: 10px;">
+            <select id="diff-sel">
                 <option value="3">3 × 3</option>
                 <option value="5">5 × 5</option>
                 <option value="8">8 × 8</option>
             </select>
-            <button onclick="bootGame()">开始游戏</button>
-            <button onclick="bootGame()">重新开始</button>
+            <button onclick="initGame(true)" style="background:#34c759; color:white; border:none;">开始游戏</button>
+            <button onclick="initGame(true)">重新开始</button>
         </div>
     </div>
 
-    <div id="game-zone">
-        <canvas id="puzzleBox"></canvas>
+    <div id="game-area">
+        <canvas id="mainCanvas"></canvas>
     </div>
 
     <div id="footer-ui">
@@ -140,308 +122,274 @@
 
 <div id="modal">
     <div id="close-modal" onclick="toggleModal(false)">×</div>
-    <img id="modal-view" src="">
+    <img id="modal-img" src="">
 </div>
 
 <script>
-    const cvs = document.getElementById('puzzleBox');
-    const ctx = cvs.getContext('2d');
-    const imgLoader = document.getElementById('img-loader');
-    const originBtn = document.getElementById('origin-btn');
-    const successMsg = document.getElementById('success-msg');
-    const diffLevel = document.getElementById('diff-level');
-    const modalView = document.getElementById('modal-view');
+    // 关卡配置
+    const levels = [
+        'https://picsum.photos/id/10/800/1000',
+        'https://picsum.photos/id/15/800/1000',
+        'https://picsum.photos/id/20/800/1000',
+        'https://picsum.photos/id/25/800/1000',
+        'https://picsum.photos/id/28/800/1000',
+        'https://picsum.photos/id/30/800/1000',
+        'https://picsum.photos/id/42/800/1000',
+        'https://picsum.photos/id/48/800/1000',
+        'https://picsum.photos/id/54/800/1000',
+        'https://picsum.photos/id/60/800/1000'
+    ];
 
-    let sourceImg = new Image();
-    let grid = [];
+    let curLvlIdx = 0;
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    
+    let img = new Image();
+    let pieces = [];
     let size = 3;
     let lW, lH; // 逻辑宽高
-    let dpr = window.devicePixelRatio || 1;
-    
-    let activePiece = null;
+    let activeP = null;
     let isDragging = false;
-    let cursor = { x: 0, y: 0 };
-    let targetIdx = -1;
-    let particles = [];
-    let finished = false;
+    let pointer = { x: 0, y: 0 };
+    let hoverIdx = -1;
+    let confetti = [];
+    let winLock = false;
 
-    // 1. 高清重置与比例适配算法
-    imgLoader.onchange = (e) => {
+    // 初始化关卡
+    window.onload = () => loadLevel(0);
+
+    function loadLevel(idx) {
+        curLvlIdx = idx % levels.length;
+        document.getElementById('level-display').innerText = `第 ${curLvlIdx + 1}/10 关`;
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            document.getElementById('modal-img').src = img.src;
+            document.getElementById('btn-origin').style.visibility = 'visible';
+            initGame(true);
+        };
+        img.src = levels[curLvlIdx];
+    }
+
+    function nextLevel() {
+        if (winLock) return;
+        loadLevel(curLvlIdx + 1);
+    }
+
+    // 本地上传适配
+    document.getElementById('file-in').onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
-            sourceImg.onload = () => {
-                originBtn.style.display = 'block';
-                modalView.src = sourceImg.src;
-                bootGame();
+            img.onload = () => {
+                document.getElementById('modal-img').src = img.src;
+                document.getElementById('level-display').innerText = "自定义关卡";
+                initGame(true);
             };
-            sourceImg.src = ev.target.result;
+            img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     };
 
-    function syncDPI() {
-        if (!sourceImg.src) return;
-        
-        const zone = document.getElementById('game-zone');
-        const header = document.getElementById('header-ui');
-        const footer = document.getElementById('footer-ui');
-        
-        // 核心：计算视口挤压后的可用空间
-        const maxLW = window.innerWidth - 40; 
-        const maxLH = window.innerHeight - header.offsetHeight - footer.offsetHeight - 40;
+    // 视口挤压与高清适配算法
+    function syncSize() {
+        const area = document.getElementById('game-area');
+        const maxLW = area.clientWidth - 10;
+        const maxLH = area.clientHeight - 10;
+        const ratio = img.width / img.height;
 
-        const ratio = sourceImg.width / sourceImg.height;
+        lW = maxLW; lH = lW / ratio;
+        if (lH > maxLH) { lH = maxLH; lW = lH * ratio; }
 
-        lW = maxLW;
-        lH = lW / ratio;
-
-        if (lH > maxLH) {
-            lH = maxLH;
-            lW = lH * ratio;
-        }
-
-        // 高清化物理尺寸设置
-        cvs.width = lW * dpr;
-        cvs.height = lH * dpr;
-        cvs.style.width = lW + 'px';
-        cvs.style.height = lH + 'px';
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        canvas.width = lW * dpr;
+        canvas.height = lH * dpr;
+        canvas.style.width = lW + 'px';
+        canvas.style.height = lH + 'px';
         
         ctx.resetTransform();
         ctx.scale(dpr, dpr);
+        ctx.imageSmoothingQuality = 'high';
     }
 
-    window.addEventListener('resize', () => {
-        if (sourceImg.src) {
-            syncDPI();
-            render();
-        }
-    });
+    function initGame(shuffle = true) {
+        if (!img.src) return;
+        winLock = false;
+        document.getElementById('success-msg').classList.remove('show');
+        confetti = [];
+        size = parseInt(document.getElementById('diff-sel').value);
+        syncSize();
 
-    function toggleModal(val) { document.getElementById('modal').style.display = val ? 'flex' : 'none'; }
-
-    // 2. 游戏核心逻辑
-    function bootGame() {
-        if (!sourceImg.src) return;
-        finished = false;
-        successMsg.classList.remove('visible');
-        particles = [];
-        size = parseInt(diffLevel.value);
-        
-        syncDPI();
-
-        grid = [];
+        pieces = [];
         for (let i = 0; i < size * size; i++) {
-            grid.push({ orig: i, curr: i, locked: false });
+            pieces.push({ orig: i, curr: i, locked: false });
         }
 
-        // 打乱
-        do {
-            for (let i = grid.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [grid[i].curr, grid[j].curr] = [grid[j].curr, grid[i].curr];
-            }
-        } while (isSolved());
-
+        if (shuffle) {
+            do {
+                for (let i = pieces.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pieces[i].curr, pieces[j].curr] = [pieces[j].curr, pieces[i].curr];
+                }
+            } while (checkWin());
+        }
         refreshStatus();
-        requestAnimationFrame(loop);
+        renderLoop();
     }
 
-    function isSolved() { return grid.every(p => p.curr === p.orig); }
+    function checkWin() { return pieces.every(p => p.curr === p.orig); }
 
     function refreshStatus() {
         let win = true;
-        grid.forEach(p => {
+        pieces.forEach(p => {
             if (p.curr === p.orig) p.locked = true;
             else { p.locked = false; win = false; }
         });
-        if (win && grid.length > 0 && !finished) {
-            finished = true;
-            successMsg.classList.add('visible');
-            triggerConfetti();
+        if (win && pieces.length > 0 && !winLock) {
+            winLock = true;
+            document.getElementById('success-msg').classList.add('show');
+            spawnConfetti();
+            setTimeout(() => { if(winLock) nextLevel(); }, 3000);
         }
     }
 
-    // 3. 增强交互
-    function getCursorPos(e) {
-        const rect = cvs.getBoundingClientRect();
+    // 交互适配
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
         return { x: t.clientX - rect.left, y: t.clientY - rect.top };
     }
 
-    cvs.addEventListener('mousedown', onStart);
-    cvs.addEventListener('touchstart', (e) => { e.preventDefault(); onStart(e); }, { passive: false });
-
     function onStart(e) {
-        if (finished) return;
-        const pos = getCursorPos(e);
+        if (winLock) return;
+        const p = getPos(e);
         const cw = lW / size, ch = lH / size;
-        const idx = Math.floor(pos.y / ch) * size + Math.floor(pos.x / cw);
-        const p = grid.find(item => item.curr === idx);
-        
-        if (p && !p.locked) {
-            activePiece = p; isDragging = true; cursor = pos;
+        const idx = Math.floor(p.y / ch) * size + Math.floor(p.x / cw);
+        const target = pieces.find(item => item.curr === idx);
+        if (target && !target.locked) {
+            activeP = target; isDragging = true; pointer = p;
         }
     }
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); onMove(e); }, { passive: false });
 
     function onMove(e) {
         if (!isDragging) return;
-        cursor = getCursorPos(e);
+        pointer = getPos(e);
         const cw = lW / size, ch = lH / size;
-        const col = Math.floor(cursor.x / cw), row = Math.floor(cursor.y / ch);
-        targetIdx = (col >= 0 && col < size && row >= 0 && row < size) ? row * size + col : -1;
+        const col = Math.floor(pointer.x / cw), row = Math.floor(pointer.y / ch);
+        hoverIdx = (col >= 0 && col < size && row >= 0 && row < size) ? row * size + col : -1;
     }
-
-    window.addEventListener('mouseup', onEnd);
-    window.addEventListener('touchend', onEnd);
 
     function onEnd() {
         if (!isDragging) return;
-        if (targetIdx !== -1) {
-            const tp = grid.find(p => p.curr === targetIdx);
-            if (tp && !tp.locked && tp !== activePiece) {
-                const tmp = activePiece.curr;
-                activePiece.curr = tp.curr;
+        if (hoverIdx !== -1) {
+            const tp = pieces.find(p => p.curr === hoverIdx);
+            if (tp && !tp.locked && tp !== activeP) {
+                const tmp = activeP.curr;
+                activeP.curr = tp.curr;
                 tp.curr = tmp;
             }
         }
-        activePiece = null; isDragging = false; targetIdx = -1;
+        activeP = null; isDragging = false; hoverIdx = -1;
         refreshStatus();
     }
 
-    // 4. 智能边框渲染系统 (v2.2 核心)
-    function loop() {
-        render();
-        requestAnimationFrame(loop);
-    }
+    canvas.addEventListener('mousedown', onStart);
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onStart(e); }, {passive:false});
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); onMove(e); }, {passive:false});
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchend', onEnd);
 
-    function render() {
+    // 智能渲染与边界合并 (v2.3 核心)
+    function renderLoop() {
         ctx.clearRect(0, 0, lW, lH);
         const cw = lW / size, ch = lH / size;
 
-        // 1. 绘制底层静态拼图
-        grid.forEach(p => {
-            if (p !== activePiece) paintFragment(p, cw, ch);
+        // 1. 绘制底层静态碎片
+        pieces.forEach(p => {
+            if (p !== activeP) drawPiece(p, cw, ch);
         });
 
-        // 2. 目标预览高亮
-        if (isDragging && targetIdx !== -1) {
-            const tp = grid.find(p => p.curr === targetIdx);
-            if (tp && !tp.locked) {
-                ctx.save();
+        // 2. 目标高亮
+        if (isDragging && hoverIdx !== -1) {
+            const hp = pieces.find(p => p.curr === hoverIdx);
+            if (hp && !hp.locked) {
                 ctx.strokeStyle = "rgba(0, 122, 255, 0.8)";
                 ctx.lineWidth = 4;
-                ctx.strokeRect((targetIdx % size) * cw + 2, Math.floor(targetIdx / size) * ch + 2, cw - 4, ch - 4);
-                ctx.restore();
+                ctx.strokeRect((hoverIdx % size) * cw + 2, Math.floor(hoverIdx / size) * ch + 2, cw - 4, ch - 4);
             }
         }
 
-        // 3. 绘制悬浮拖拽块
-        if (activePiece) {
+        // 3. 悬浮块绘制
+        if (activeP) {
             ctx.save();
-            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.4)";
+            ctx.shadowBlur = 15; ctx.shadowColor = "rgba(0,0,0,0.4)";
             ctx.globalAlpha = 0.85;
-            drawPieceContent(activePiece, cursor.x - cw/2, cursor.y - ch/2, cw, ch);
-            // 拖拽块始终显示完整边框
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(cursor.x - cw/2, cursor.y - ch/2, cw, ch);
+            const x = pointer.x - cw/2, y = pointer.y - ch/2;
+            drawImgFrag(activeP, x, y, cw, ch);
+            ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.strokeRect(x,y,cw,ch);
             ctx.restore();
         }
 
-        // 4. 特效系统
-        if (particles.length > 0) {
-            particles.forEach((p, i) => {
-                p.y += p.v; p.x += Math.sin(p.a) * 2;
-                ctx.fillStyle = p.c;
-                ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2); ctx.fill();
-                if (p.y > lH) particles.splice(i, 1);
+        // 4. 五彩纸屑
+        if (confetti.length > 0) {
+            confetti.forEach((c, i) => {
+                c.y += c.v; c.x += Math.sin(c.a) * 2;
+                ctx.fillStyle = c.color;
+                ctx.beginPath(); ctx.arc(c.x, c.y, c.s, 0, Math.PI*2); ctx.fill();
+                if (c.y > lH) confetti.splice(i, 1);
             });
         }
+        requestAnimationFrame(renderLoop);
     }
 
-    function paintFragment(p, cw, ch) {
+    function drawPiece(p, cw, ch) {
         const x = (p.curr % size) * cw;
         const y = Math.floor(p.curr / size) * ch;
-        drawPieceContent(p, x, y, cw, ch);
+        drawImgFrag(p, x, y, cw, ch);
 
-        // 智能邻域边框逻辑
         if (p.locked) {
             ctx.save();
-            ctx.strokeStyle = "lime";
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = "lime"; ctx.lineWidth = 3;
             ctx.beginPath();
+            const r = Math.floor(p.curr / size), c = p.curr % size;
+            
+            // 邻域检测合并算法
+            const check = (idx) => {
+                const neighbor = pieces.find(item => item.curr === idx);
+                return neighbor && neighbor.locked;
+            };
 
-            const row = Math.floor(p.curr / size);
-            const col = p.curr % size;
-
-            // 检测上邻
-            let upLocked = false;
-            if (row > 0) {
-                const up = grid.find(item => item.curr === p.curr - size);
-                if (up && up.locked) upLocked = true;
-            }
-            if (!upLocked) { ctx.moveTo(x, y); ctx.lineTo(x + cw, y); }
-
-            // 检测下邻
-            let downLocked = false;
-            if (row < size - 1) {
-                const down = grid.find(item => item.curr === p.curr + size);
-                if (down && down.locked) downLocked = true;
-            }
-            if (!downLocked) { ctx.moveTo(x, y + ch); ctx.lineTo(x + cw, y + ch); }
-
-            // 检测左邻
-            let leftLocked = false;
-            if (col > 0) {
-                const left = grid.find(item => item.curr === p.curr - 1);
-                if (left && left.locked) leftLocked = true;
-            }
-            if (!leftLocked) { ctx.moveTo(x, y); ctx.lineTo(x, y + ch); }
-
-            // 检测右邻
-            let rightLocked = false;
-            if (col < size - 1) {
-                const right = grid.find(item => item.curr === p.curr + 1);
-                if (right && right.locked) rightLocked = true;
-            }
-            if (!rightLocked) { ctx.moveTo(x + cw, y); ctx.lineTo(x + cw, y + ch); }
-
-            ctx.stroke();
-            ctx.restore();
+            if (r === 0 || !check(p.curr - size)) { ctx.moveTo(x, y); ctx.lineTo(x + cw, y); }
+            if (r === size - 1 || !check(p.curr + size)) { ctx.moveTo(x, y + ch); ctx.lineTo(x + cw, y + ch); }
+            if (c === 0 || !check(p.curr - 1)) { ctx.moveTo(x, y); ctx.lineTo(x, y + ch); }
+            if (c === size - 1 || !check(p.curr + 1)) { ctx.moveTo(x + cw, y); ctx.lineTo(x + cw, y + ch); }
+            
+            ctx.stroke(); ctx.restore();
         } else {
-            // 未锁定的显示细白线
-            ctx.strokeStyle = "rgba(255,255,255,0.8)";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x, y, cw, ch);
+            ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; ctx.strokeRect(x, y, cw, ch);
         }
     }
 
-    function drawPieceContent(p, x, y, cw, ch) {
-        const sw = sourceImg.width / size;
-        const sh = sourceImg.height / size;
-        const sx = (p.orig % size) * sw;
-        const sy = Math.floor(p.orig / size) * sh;
-        ctx.drawImage(sourceImg, sx, sy, sw, sh, x, y, cw, ch);
+    function drawImgFrag(p, x, y, cw, ch) {
+        const sw = img.width / size, sh = img.height / size;
+        const sx = (p.orig % size) * sw, sy = Math.floor(p.orig / size) * sh;
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, cw, ch);
     }
 
-    function triggerConfetti() {
-        const colors = ['#FF3B30', '#4CD964', '#007AFF', '#FFCC00', '#FF9500', '#5856D6'];
+    function spawnConfetti() {
+        const colors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#ff9500', '#5856d6'];
         for (let i = 0; i < 150; i++) {
-            particles.push({
+            confetti.push({
                 x: Math.random() * lW, y: -20, s: Math.random() * 4 + 2,
-                c: colors[Math.floor(Math.random() * colors.length)],
+                color: colors[Math.floor(Math.random() * colors.length)],
                 v: Math.random() * 3 + 3, a: Math.random() * 6
             });
         }
     }
+
+    function toggleModal(val) { document.getElementById('modal').style.display = val ? 'flex' : 'none'; }
+    window.addEventListener('resize', () => { if(img.src) { syncSize(); } });
 </script>
 </body>
 </html>
