@@ -3,324 +3,273 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图小游戏 v1.5</title>
+    <title>拼图小游戏 v1.6</title>
     <style>
         :root {
-            --bg-color: #f0f2f5;
-            --primary-color: #007aff;
-            --success-color: #28a745;
-            --border-white: #ffffff;
+            --primary: #007aff;
+            --success: #28a745;
+            --bg: #f5f5f7;
         }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            touch-action: none; /* 防止移动端默认滚动/缩放 */
-            user-select: none;
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: var(--bg);
+            margin: 0; padding: 10px;
+            display: flex; flex-direction: column; align-items: center;
+            touch-action: none; user-select: none;
         }
-
-        h2 { margin: 15px 0; color: #333; }
-
-        .row { margin: 8px 0; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-
+        h2 { margin: 10px 0; font-size: 1.4rem; color: #333; }
+        .row { display: flex; gap: 8px; margin: 5px 0; flex-wrap: wrap; justify-content: center; }
         button, select {
-            padding: 8px 15px;
-            font-size: 14px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            background: white;
-            cursor: pointer;
+            padding: 8px 16px; border-radius: 8px; border: 1px solid #ccc;
+            background: white; font-size: 14px; cursor: pointer;
         }
-
-        #show-origin-btn { display: none; background-color: var(--primary-color); color: white; border: none; }
-
+        button:active { background: #eee; }
+        #show-origin-btn { display: none; background: var(--primary); color: white; border: none; }
+        
         #game-container {
+            margin-top: 15px;
             position: relative;
-            margin-top: 20px;
-            background: #ddd;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            background: #fff;
         }
+        canvas { display: block; cursor: move; }
 
-        canvas { display: block; background-color: #eee; }
-
-        /* 遮罩层/原图显示 */
+        /* 原图遮罩层 */
         #overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 1000;
+            justify-content: center; align-items: center;
         }
+        #overlay img { max-width: 95%; max-height: 85%; object-fit: contain; border: 2px solid #fff; }
+        #close-btn { position: absolute; top: 20px; right: 20px; color: white; font-size: 40px; cursor: pointer; }
 
-        #overlay img { max-width: 90%; max-height: 80%; border: 3px solid white; }
-
-        #close-overlay {
-            position: absolute;
-            top: 20px; right: 20px;
-            color: white; font-size: 30px; cursor: pointer;
-        }
-
-        #status-msg {
-            margin-top: 20px;
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--success-color);
-            height: 30px;
+        #success-label {
+            margin-top: 20px; font-size: 22px; font-weight: bold;
+            color: var(--success); height: 30px;
         }
     </style>
 </head>
 <body>
 
-    <h2>拼图小游戏，版本 1.5</h2>
+    <h2>拼图小游戏，版本 1.6</h2>
 
     <div class="row">
-        <input type="file" id="file-input" accept="image/*" style="display:none">
-        <button onclick="document.getElementById('file-input').click()">选择图片</button>
-        <button id="show-origin-btn" onclick="toggleOverlay(true)">显示原图</button>
+        <input type="file" id="loader" accept="image/*" style="display:none">
+        <button onclick="document.getElementById('loader').click()">选择图片</button>
+        <button id="show-origin-btn" onclick="showOverlay(true)">显示原图</button>
     </div>
 
     <div class="row">
-        <select id="difficulty">
+        <select id="diff">
             <option value="3">3*3</option>
             <option value="5">5*5</option>
             <option value="8">8*8</option>
         </select>
-        <button onclick="initGame()">开始游戏</button>
-        <button onclick="initGame()">重新开始</button>
+        <button onclick="startGame()">开始游戏</button>
+        <button onclick="startGame()">重新开始</button>
     </div>
 
     <div id="game-container">
-        <canvas id="puzzleCanvas"></canvas>
+        <canvas id="cvs"></canvas>
     </div>
 
-    <div id="status-msg"></div>
+    <div id="success-label"></div>
 
     <div id="overlay">
-        <span id="close-overlay" onclick="toggleOverlay(false)">×</span>
-        <img id="origin-img-preview" src="" alt="原图">
+        <span id="close-btn" onclick="showOverlay(false)">×</span>
+        <img id="preview-img">
     </div>
 
-    <script>
-        const canvas = document.getElementById('puzzleCanvas');
-        const ctx = canvas.getContext('2d');
-        const fileInput = document.getElementById('file-input');
-        const statusMsg = document.getElementById('status-msg');
-        const showOriginBtn = document.getElementById('show-origin-btn');
-        const originImgPreview = document.getElementById('origin-img-preview');
+<script>
+    const cvs = document.getElementById('cvs');
+    const ctx = cvs.getContext('2d');
+    const loader = document.getElementById('loader');
+    const diffEl = document.getElementById('diff');
+    const successLabel = document.getElementById('success-label');
+    const showBtn = document.getElementById('show-origin-btn');
+    const previewImg = document.getElementById('preview-img');
 
-        let img = new Image();
-        let pieces = [];
-        let gridSize = 3;
-        let pieceWidth, pieceHeight;
-        let canvasWidth;
-        
-        let dragItem = null;
-        let isDragging = false;
-        let mouseX, mouseY;
-        let targetIndex = -1;
+    let img = new Image();
+    let pieces = [];
+    let side; // 难度系数
+    let pW, pH; // 碎片宽高
+    let dragItem = null;
+    let isMoving = false;
+    let mX, mY;
+    let hoverIdx = -1;
 
-        // 响应式画布宽度 (适配手机)
-        canvasWidth = Math.min(window.innerWidth * 0.9, 500);
-        canvas.width = canvasWidth;
-        canvas.height = canvasWidth;
-
-        // 图片加载与切分处理
-        fileInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                img.onload = () => {
-                    showOriginBtn.style.display = 'inline-block';
-                    originImgPreview.src = img.src;
-                    initGame();
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
+    loader.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            showBtn.style.display = 'block';
+            previewImg.src = img.src;
+            // 比例适配核心逻辑
+            const screenWidth = Math.min(window.innerWidth - 30, 600);
+            const ratio = img.width / img.height;
+            cvs.width = screenWidth;
+            cvs.height = screenWidth / ratio;
+            startGame();
         };
+        img.src = url;
+    };
 
-        function toggleOverlay(show) {
-            document.getElementById('overlay').style.display = show ? 'flex' : 'none';
+    function showOverlay(val) { document.getElementById('overlay').style.display = val ? 'flex' : 'none'; }
+
+    function startGame() {
+        if (!img.src) return;
+        successLabel.innerText = "";
+        side = parseInt(diffEl.value);
+        pW = cvs.width / side;
+        pH = cvs.height / side;
+        
+        pieces = [];
+        for (let i = 0; i < side * side; i++) {
+            pieces.push({
+                orig: i,
+                curr: i,
+                locked: false
+            });
         }
 
-        function initGame() {
-            if (!img.src) { alert("请先选择图片！"); return; }
-            statusMsg.innerText = "";
-            gridSize = parseInt(document.getElementById('difficulty').value);
-            pieceWidth = canvas.width / gridSize;
-            pieceHeight = canvas.height / gridSize;
-            
-            pieces = [];
-            for (let r = 0; r < gridSize; r++) {
-                for (let c = 0; c < gridSize; c++) {
-                    pieces.push({
-                        originalIndex: r * gridSize + c,
-                        currentIndex: r * gridSize + c,
-                        r: r, c: c,
-                        isLocked: false
-                    });
-                }
-            }
-
-            // 打乱顺序，但要确保不直接就在正确位置（除非运气极佳）
-            shuffle(pieces);
-            checkLockStatus();
-            draw();
-        }
-
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
+        // 随机打乱
+        do {
+            for (let i = pieces.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [array[i].currentIndex, array[j].currentIndex] = [array[j].currentIndex, array[i].currentIndex];
+                [pieces[i].curr, pieces[j].curr] = [pieces[j].curr, pieces[i].curr];
+            }
+        } while (isWin()); // 确保初始不是完成状态
+
+        updateLocks();
+        render();
+    }
+
+    function updateLocks() {
+        let allReady = true;
+        pieces.forEach(p => {
+            if (p.curr === p.orig) p.locked = true;
+            else allReady = false;
+        });
+        if (allReady && pieces.length > 0) successLabel.innerText = "拼图成功";
+    }
+
+    function isWin() {
+        return pieces.every(p => p.curr === p.orig);
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        
+        // 1. 画底层图片（非拖拽中）
+        pieces.forEach(p => {
+            if (p === dragItem) return;
+            drawPiece(p);
+        });
+
+        // 2. 画高亮目标格
+        if (isMoving && hoverIdx !== -1) {
+            const targetP = pieces.find(p => p.curr === hoverIdx);
+            if (targetP && !targetP.locked) {
+                ctx.strokeStyle = "rgba(0, 122, 255, 0.6)";
+                ctx.lineWidth = 6;
+                const pos = getXY(hoverIdx);
+                ctx.strokeRect(pos.x + 3, pos.y + 3, pW - 6, pH - 6);
             }
         }
 
-        function checkLockStatus() {
-            let win = true;
-            pieces.forEach(p => {
-                if (p.currentIndex === p.originalIndex) {
-                    p.isLocked = true;
-                } else {
-                    p.isLocked = false;
-                    win = false;
-                }
-            });
-            if (win && pieces.length > 0) statusMsg.innerText = "拼图成功";
+        // 3. 画拖拽项（置顶）
+        if (dragItem) {
+            ctx.save();
+            ctx.globalAlpha = 0.8;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+            drawAt(dragItem, mX - pW / 2, mY - pH / 2);
+            ctx.restore();
         }
+    }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 绘制非拖拽中的图片
-            pieces.forEach(p => {
-                if (p === dragItem) return;
-                drawPiece(p);
-            });
+    function drawPiece(p) {
+        const pos = getXY(p.curr);
+        drawAt(p, pos.x, pos.y);
+    }
 
-            // 如果正在拖拽，最后绘制拖拽项（确保置顶）
-            if (dragItem) {
-                ctx.save();
-                ctx.globalAlpha = 0.7;
-                drawPieceAt(dragItem, mouseX - pieceWidth / 2, mouseY - pieceHeight / 2);
-                ctx.restore();
-                
-                // 绘制目标位置的高亮（视觉反馈）
-                if (targetIndex !== -1) {
-                    const targetPos = getPosByIndex(targetIndex);
-                    ctx.strokeStyle = "rgba(0, 122, 255, 0.8)";
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(targetPos.x, targetPos.y, pieceWidth, pieceHeight);
-                }
+    function drawAt(p, x, y) {
+        const sx = (p.orig % side) * (img.width / side);
+        const sy = Math.floor(p.orig / side) * (img.height / side);
+        const sw = img.width / side;
+        const sh = img.height / side;
+
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, pW, pH);
+
+        // 边框规则：锁定绿色，默认白色
+        ctx.strokeStyle = p.locked ? "lime" : "white";
+        ctx.lineWidth = p.locked ? 3 : 1;
+        ctx.strokeRect(x, y, pW, pH);
+    }
+
+    function getXY(index) {
+        return { x: (index % side) * pW, y: Math.floor(index / side) * pH };
+    }
+
+    // 交互适配
+    function getPos(e) {
+        const rect = cvs.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    }
+
+    function start(e) {
+        if (successLabel.innerText !== "") return;
+        const pos = getPos(e);
+        const idx = Math.floor(pos.y / pH) * side + Math.floor(pos.x / pW);
+        const p = pieces.find(item => item.curr === idx);
+        
+        if (p && !p.locked) {
+            dragItem = p;
+            isMoving = true;
+            mX = pos.x; mY = pos.y;
+        }
+    }
+
+    function move(e) {
+        if (!isMoving) return;
+        if (e.cancelable) e.preventDefault(); 
+        const pos = getPos(e);
+        mX = pos.x; mY = pos.y;
+        
+        const c = Math.floor(mX / pW);
+        const r = Math.floor(mY / pH);
+        if (c >= 0 && c < side && r >= 0 && r < side) hoverIdx = r * side + c;
+        else hoverIdx = -1;
+        
+        render();
+    }
+
+    function end() {
+        if (!isMoving) return;
+        if (hoverIdx !== -1) {
+            const target = pieces.find(p => p.curr === hoverIdx);
+            // 目标不能是自己，且不能是已锁定的
+            if (target && !target.locked && target !== dragItem) {
+                const temp = dragItem.curr;
+                dragItem.curr = target.curr;
+                target.curr = temp;
             }
         }
+        dragItem = null; isMoving = false; hoverIdx = -1;
+        updateLocks();
+        render();
+    }
 
-        function drawPiece(p) {
-            const pos = getPosByIndex(p.currentIndex);
-            drawPieceAt(p, pos.x, pos.y);
-        }
+    cvs.addEventListener('mousedown', start);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
 
-        function drawPieceAt(p, x, y) {
-            const srcR = Math.floor(p.originalIndex / gridSize);
-            const srcC = p.originalIndex % gridSize;
+    cvs.addEventListener('touchstart', start, {passive: false});
+    window.addEventListener('touchmove', move, {passive: false});
+    window.addEventListener('touchend', end);
 
-            // 保持原图比例居中裁剪逻辑
-            const sw = img.width / gridSize;
-            const sh = img.height / gridSize;
-            
-            ctx.drawImage(img, srcC * sw, srcR * sh, sw, sh, x, y, pieceWidth, pieceHeight);
-
-            // 边框逻辑：正确位置绿色，否则白色
-            ctx.strokeStyle = p.isLocked ? "lime" : "white";
-            ctx.lineWidth = p.isLocked ? 3 : 1;
-            ctx.strokeRect(x, y, pieceWidth, pieceHeight);
-        }
-
-        function getPosByIndex(index) {
-            return {
-                x: (index % gridSize) * pieceWidth,
-                y: Math.floor(index / gridSize) * pieceHeight
-            };
-        }
-
-        // 交互逻辑
-        function handleStart(e) {
-            if (statusMsg.innerText === "拼图成功") return;
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const x = clientX - rect.left;
-            const y = clientY - rect.top;
-
-            const col = Math.floor(x / pieceWidth);
-            const row = Math.floor(y / pieceHeight);
-            const index = row * gridSize + col;
-
-            const piece = pieces.find(p => p.currentIndex === index);
-            if (piece && !piece.isLocked) {
-                dragItem = piece;
-                isDragging = true;
-                mouseX = x;
-                mouseY = y;
-            }
-        }
-
-        function handleMove(e) {
-            if (!isDragging) return;
-            e.preventDefault(); // 关键：阻止移动端滚动
-
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            mouseX = clientX - rect.left;
-            mouseY = clientY - rect.top;
-
-            const col = Math.floor(mouseX / pieceWidth);
-            const row = Math.floor(mouseY / pieceHeight);
-            
-            if(col >=0 && col < gridSize && row >=0 && row < gridSize) {
-                targetIndex = row * gridSize + col;
-            } else {
-                targetIndex = -1;
-            }
-            draw();
-        }
-
-        function handleEnd() {
-            if (!isDragging) return;
-
-            if (targetIndex !== -1) {
-                const targetPiece = pieces.find(p => p.currentIndex === targetIndex);
-                // 只有当目标位置没有被锁定时才能交换
-                if (targetPiece && !targetPiece.isLocked && targetPiece !== dragItem) {
-                    const tempIndex = dragItem.currentIndex;
-                    dragItem.currentIndex = targetPiece.currentIndex;
-                    targetPiece.currentIndex = tempIndex;
-                }
-            }
-
-            dragItem = null;
-            isDragging = false;
-            targetIndex = -1;
-            checkLockStatus();
-            draw();
-        }
-
-        // 绑定事件
-        canvas.addEventListener('mousedown', handleStart);
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
-
-        canvas.addEventListener('touchstart', handleStart, {passive: false});
-        window.addEventListener('touchmove', handleMove, {passive: false});
-        window.addEventListener('touchend', handleEnd);
-
-    </script>
+</script>
 </body>
 </html>
