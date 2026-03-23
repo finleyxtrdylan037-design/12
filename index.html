@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图小游戏 v1.6</title>
+    <title>拼图小游戏 v1.7</title>
     <style>
         :root {
             --primary: #007aff;
-            --success: #28a745;
+            --success: #1d7a2a;
             --bg: #f5f5f7;
         }
         body {
@@ -15,260 +15,304 @@
             background-color: var(--bg);
             margin: 0; padding: 10px;
             display: flex; flex-direction: column; align-items: center;
-            touch-action: none; user-select: none;
+            touch-action: none; overflow-x: hidden;
         }
-        h2 { margin: 10px 0; font-size: 1.4rem; color: #333; }
+        h2 { margin: 10px 0; color: #333; }
         .row { display: flex; gap: 8px; margin: 5px 0; flex-wrap: wrap; justify-content: center; }
+        
         button, select {
-            padding: 8px 16px; border-radius: 8px; border: 1px solid #ccc;
+            padding: 10px 16px; border-radius: 8px; border: 1px solid #ccc;
             background: white; font-size: 14px; cursor: pointer;
         }
-        button:active { background: #eee; }
         #show-origin-btn { display: none; background: var(--primary); color: white; border: none; }
-        
-        #game-container {
-            margin-top: 15px;
-            position: relative;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            background: #fff;
-        }
-        canvas { display: block; cursor: move; }
 
-        /* 原图遮罩层 */
+        /* 核心布局修复：确保画布下方有足够的安全空间 */
+        #main-wrapper {
+            position: relative;
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            background: #fff;
+            z-index: 5;
+        }
+        canvas { display: block; }
+
+        /* 成功反馈区：布局安全区 */
+        #success-zone {
+            width: 100%;
+            height: 80px; /* 固定高度安全区 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: visible; /* 严禁截断 */
+            padding-bottom: 20px;
+        }
+
+        #success-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--success);
+            display: none; /* 初始隐藏 */
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 原图遮罩 */
         #overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 1000;
             justify-content: center; align-items: center;
         }
-        #overlay img { max-width: 95%; max-height: 85%; object-fit: contain; border: 2px solid #fff; }
+        #overlay img { max-width: 90%; max-height: 80%; border: 2px solid #fff; }
         #close-btn { position: absolute; top: 20px; right: 20px; color: white; font-size: 40px; cursor: pointer; }
-
-        #success-label {
-            margin-top: 20px; font-size: 22px; font-weight: bold;
-            color: var(--success); height: 30px;
-        }
     </style>
 </head>
 <body>
 
-    <h2>拼图小游戏，版本 1.6</h2>
+    <h2>拼图小游戏，版本 1.7</h2>
 
     <div class="row">
-        <input type="file" id="loader" accept="image/*" style="display:none">
-        <button onclick="document.getElementById('loader').click()">选择图片</button>
-        <button id="show-origin-btn" onclick="showOverlay(true)">显示原图</button>
+        <input type="file" id="imageLoader" accept="image/*" style="display:none">
+        <button onclick="document.getElementById('imageLoader').click()">选择图片</button>
+        <button id="show-origin-btn" onclick="toggleOverlay(true)">显示原图</button>
     </div>
 
     <div class="row">
-        <select id="diff">
+        <select id="difficulty">
             <option value="3">3*3</option>
             <option value="5">5*5</option>
             <option value="8">8*8</option>
         </select>
-        <button onclick="startGame()">开始游戏</button>
-        <button onclick="startGame()">重新开始</button>
+        <button onclick="initGame()">开始游戏</button>
+        <button onclick="initGame()">重新开始</button>
     </div>
 
-    <div id="game-container">
-        <canvas id="cvs"></canvas>
+    <div id="main-wrapper">
+        <div id="game-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div id="success-zone">
+            <div id="success-text">拼图成功</div>
+        </div>
     </div>
-
-    <div id="success-label"></div>
 
     <div id="overlay">
-        <span id="close-btn" onclick="showOverlay(false)">×</span>
-        <img id="preview-img">
+        <span id="close-btn" onclick="toggleOverlay(false)">×</span>
+        <img id="full-preview">
     </div>
 
 <script>
-    const cvs = document.getElementById('cvs');
-    const ctx = cvs.getContext('2d');
-    const loader = document.getElementById('loader');
-    const diffEl = document.getElementById('diff');
-    const successLabel = document.getElementById('success-label');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const imageLoader = document.getElementById('imageLoader');
+    const successText = document.getElementById('success-text');
     const showBtn = document.getElementById('show-origin-btn');
-    const previewImg = document.getElementById('preview-img');
+    const fullPreview = document.getElementById('full-preview');
 
     let img = new Image();
     let pieces = [];
-    let side; // 难度系数
-    let pW, pH; // 碎片宽高
+    let size = 3;
+    let pw, ph;
     let dragItem = null;
-    let isMoving = false;
-    let mX, mY;
+    let isDragging = false;
+    let mousePos = { x: 0, y: 0 };
     let hoverIdx = -1;
+    let confetti = [];
 
-    loader.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const url = URL.createObjectURL(file);
-        img.onload = () => {
-            showBtn.style.display = 'block';
-            previewImg.src = img.src;
-            // 比例适配核心逻辑
-            const screenWidth = Math.min(window.innerWidth - 30, 600);
-            const ratio = img.width / img.height;
-            cvs.width = screenWidth;
-            cvs.height = screenWidth / ratio;
-            startGame();
+    // 图片加载
+    imageLoader.onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            img.onload = () => {
+                showBtn.style.display = 'block';
+                fullPreview.src = img.src;
+                // 动态自适应比例
+                const maxWidth = Math.min(window.innerWidth - 40, 600);
+                const ratio = img.width / img.height;
+                canvas.width = maxWidth;
+                canvas.height = maxWidth / ratio;
+                initGame();
+            };
+            img.src = ev.target.result;
         };
-        img.src = url;
+        reader.readAsDataURL(e.target.files[0]);
     };
 
-    function showOverlay(val) { document.getElementById('overlay').style.display = val ? 'flex' : 'none'; }
+    function toggleOverlay(show) { document.getElementById('overlay').style.display = show ? 'flex' : 'none'; }
 
-    function startGame() {
+    function initGame() {
         if (!img.src) return;
-        successLabel.innerText = "";
-        side = parseInt(diffEl.value);
-        pW = cvs.width / side;
-        pH = cvs.height / side;
+        successText.style.display = 'none';
+        confetti = [];
+        size = parseInt(document.getElementById('difficulty').value);
+        pw = canvas.width / size;
+        ph = canvas.height / size;
         
         pieces = [];
-        for (let i = 0; i < side * side; i++) {
-            pieces.push({
-                orig: i,
-                curr: i,
-                locked: false
-            });
+        for (let i = 0; i < size * size; i++) {
+            pieces.push({ orig: i, curr: i, locked: false });
         }
 
-        // 随机打乱
+        // 洗牌逻辑
         do {
             for (let i = pieces.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [pieces[i].curr, pieces[j].curr] = [pieces[j].curr, pieces[i].curr];
             }
-        } while (isWin()); // 确保初始不是完成状态
+        } while (checkWin());
 
-        updateLocks();
-        render();
+        updateStatus();
+        animate();
     }
 
-    function updateLocks() {
-        let allReady = true;
+    function updateStatus() {
+        let win = true;
         pieces.forEach(p => {
             if (p.curr === p.orig) p.locked = true;
-            else allReady = false;
+            else { p.locked = false; win = false; }
         });
-        if (allReady && pieces.length > 0) successLabel.innerText = "拼图成功";
+        if (win && pieces.length > 0) {
+            successText.style.display = 'block';
+            createConfetti();
+        }
     }
 
-    function isWin() {
-        return pieces.every(p => p.curr === p.orig);
+    function checkWin() { return pieces.every(p => p.curr === p.orig); }
+
+    // 特效：五彩纸屑粒子
+    function createConfetti() {
+        for (let i = 0; i < 100; i++) {
+            confetti.push({
+                x: Math.random() * canvas.width,
+                y: -20,
+                r: Math.random() * 6 + 4,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                vx: Math.random() * 4 - 2,
+                vy: Math.random() * 5 + 2,
+                angle: Math.random() * 360
+            });
+        }
     }
 
-    function render() {
-        ctx.clearRect(0, 0, cvs.width, cvs.height);
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // 1. 画底层图片（非拖拽中）
+        // 1. 绘制拼图
         pieces.forEach(p => {
             if (p === dragItem) return;
             drawPiece(p);
         });
 
-        // 2. 画高亮目标格
-        if (isMoving && hoverIdx !== -1) {
+        // 2. 目标位置高亮
+        if (isDragging && hoverIdx !== -1) {
             const targetP = pieces.find(p => p.curr === hoverIdx);
             if (targetP && !targetP.locked) {
-                ctx.strokeStyle = "rgba(0, 122, 255, 0.6)";
-                ctx.lineWidth = 6;
-                const pos = getXY(hoverIdx);
-                ctx.strokeRect(pos.x + 3, pos.y + 3, pW - 6, pH - 6);
+                ctx.strokeStyle = "rgba(0, 122, 255, 0.7)";
+                ctx.lineWidth = 4;
+                const pos = getPos(hoverIdx);
+                ctx.strokeRect(pos.x + 2, pos.y + 2, pw - 4, ph - 4);
             }
         }
 
-        // 3. 画拖拽项（置顶）
+        // 3. 绘制拖拽块
         if (dragItem) {
             ctx.save();
             ctx.globalAlpha = 0.8;
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "rgba(0,0,0,0.3)";
-            drawAt(dragItem, mX - pW / 2, mY - pH / 2);
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = "rgba(0,0,0,0.4)";
+            drawAt(dragItem, mousePos.x - pw/2, mousePos.y - ph/2);
             ctx.restore();
         }
+
+        // 4. 绘制成功粒子
+        if (confetti.length > 0) {
+            confetti.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+                if (p.y > canvas.height) confetti.splice(i, 1);
+            });
+        }
+
+        requestAnimationFrame(animate);
     }
 
     function drawPiece(p) {
-        const pos = getXY(p.curr);
+        const pos = getPos(p.curr);
         drawAt(p, pos.x, pos.y);
     }
 
     function drawAt(p, x, y) {
-        const sx = (p.orig % side) * (img.width / side);
-        const sy = Math.floor(p.orig / side) * (img.height / side);
-        const sw = img.width / side;
-        const sh = img.height / side;
-
-        ctx.drawImage(img, sx, sy, sw, sh, x, y, pW, pH);
-
-        // 边框规则：锁定绿色，默认白色
+        const sx = (p.orig % size) * (img.width / size);
+        const sy = Math.floor(p.orig / size) * (img.height / size);
+        const sw = img.width / size;
+        const sh = img.height / size;
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, pw, ph);
         ctx.strokeStyle = p.locked ? "lime" : "white";
-        ctx.lineWidth = p.locked ? 3 : 1;
-        ctx.strokeRect(x, y, pW, pH);
+        ctx.lineWidth = p.locked ? 4 : 1;
+        ctx.strokeRect(x, y, pw, ph);
     }
 
-    function getXY(index) {
-        return { x: (index % side) * pW, y: Math.floor(index / side) * pH };
-    }
+    function getPos(idx) { return { x: (idx % size) * pw, y: Math.floor(idx / size) * ph }; }
 
     // 交互适配
-    function getPos(e) {
-        const rect = cvs.getBoundingClientRect();
+    function handleStart(e) {
+        if (successText.style.display === 'block') return;
+        const rect = canvas.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
-        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-    }
-
-    function start(e) {
-        if (successLabel.innerText !== "") return;
-        const pos = getPos(e);
-        const idx = Math.floor(pos.y / pH) * side + Math.floor(pos.x / pW);
+        const x = t.clientX - rect.left;
+        const y = t.clientY - rect.top;
+        const idx = Math.floor(y / ph) * size + Math.floor(x / pw);
         const p = pieces.find(item => item.curr === idx);
-        
         if (p && !p.locked) {
-            dragItem = p;
-            isMoving = true;
-            mX = pos.x; mY = pos.y;
+            dragItem = p; isDragging = true;
+            mousePos = { x, y };
         }
     }
 
-    function move(e) {
-        if (!isMoving) return;
-        if (e.cancelable) e.preventDefault(); 
-        const pos = getPos(e);
-        mX = pos.x; mY = pos.y;
-        
-        const c = Math.floor(mX / pW);
-        const r = Math.floor(mY / pH);
-        if (c >= 0 && c < side && r >= 0 && r < side) hoverIdx = r * side + c;
-        else hoverIdx = -1;
-        
-        render();
+    function handleMove(e) {
+        if (!isDragging) return;
+        if (e.cancelable) e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        mousePos = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+        const c = Math.floor(mousePos.x / pw), r = Math.floor(mousePos.y / ph);
+        hoverIdx = (c >= 0 && c < size && r >= 0 && r < size) ? r * size + c : -1;
     }
 
-    function end() {
-        if (!isMoving) return;
+    function handleEnd() {
+        if (!isDragging) return;
         if (hoverIdx !== -1) {
             const target = pieces.find(p => p.curr === hoverIdx);
-            // 目标不能是自己，且不能是已锁定的
             if (target && !target.locked && target !== dragItem) {
                 const temp = dragItem.curr;
                 dragItem.curr = target.curr;
                 target.curr = temp;
             }
         }
-        dragItem = null; isMoving = false; hoverIdx = -1;
-        updateLocks();
-        render();
+        dragItem = null; isDragging = false;
+        updateStatus();
     }
 
-    cvs.addEventListener('mousedown', start);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
-
-    cvs.addEventListener('touchstart', start, {passive: false});
-    window.addEventListener('touchmove', move, {passive: false});
-    window.addEventListener('touchend', end);
+    canvas.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, {passive: false});
+    window.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('touchend', handleEnd);
 
 </script>
 </body>
