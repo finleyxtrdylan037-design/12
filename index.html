@@ -2,126 +2,107 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼图小游戏 v1.9</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>拼图小游戏 v2.0</title>
     <style>
         :root {
-            --primary-color: #007aff;
-            --success-color: #1d7a2a;
-            --bg-color: #f5f5f7;
-            --border-color: #ccc;
+            --primary: #007aff;
+            --success: #1d7a2a;
+            --bg: #f5f5f7;
+            --white: #ffffff;
         }
 
-        /* 锁定布局，严禁滚动 */
+        /* 核心修复：100dvh 解决 iOS 工具栏遮挡 */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body, html {
             margin: 0; padding: 0;
-            width: 100%; height: 100vh;
+            width: 100%; height: 100dvh; 
             overflow: hidden;
-            background-color: var(--bg-color);
+            background-color: var(--bg);
             font-family: -apple-system, system-ui, sans-serif;
-            touch-action: none; 
+            touch-action: none; /* 彻底防止手势干扰 */
         }
 
-        /* Flexbox 垂直分布 */
-        .container {
+        /* Flex 垂直布局容器 */
+        .app-container {
             display: flex;
             flex-direction: column;
             width: 100%;
-            height: 100%;
-            padding: 10px 0;
+            height: 100dvh;
+            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
         }
 
-        #header, #controls, #settings {
+        /* 顶部标题与控制区 */
+        #ui-header {
             flex-shrink: 0;
+            padding: 10px 0 5px;
             text-align: center;
-            width: 100%;
+            background: var(--bg);
+            z-index: 10;
         }
+        h2 { margin: 0 0 8px; font-size: 1.1rem; color: #333; }
 
-        h2 { margin: 5px 0; font-size: 1.2rem; color: #333; }
-
-        .row {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 5px 0;
-            padding: 0 10px;
-            flex-wrap: wrap;
-        }
-
-        button, select {
-            padding: 8px 12px;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: white;
-            cursor: pointer;
-            outline: none;
-        }
-
-        button:active { background: #e5e5e5; }
+        .btn-group { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
         
-        #btn-origin { 
-            display: none; 
-            background-color: var(--primary-color); 
-            color: white; 
-            border: none; 
+        button, select {
+            padding: 8px 14px; font-size: 14px; border-radius: 8px;
+            border: 1px solid #ccc; background: var(--white); cursor: pointer;
+            transition: background 0.2s;
         }
+        button:active { background: #ebebeb; }
+        
+        #origin-btn { display: none; background: var(--primary); color: white; border: none; }
 
-        /* 核心游戏区：自适应剩余空间 */
-        #game-area {
-            flex: 1;
+        /* 核心游戏区：自动挤压逻辑 */
+        #game-container {
+            flex: 1; /* 占据剩余所有空间 */
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
             padding: 10px;
+            min-height: 0; /* 允许 Flex 项目在空间不足时缩小 */
             overflow: hidden;
         }
 
         canvas {
             background-color: #fff;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            display: block;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            max-width: 100%;
+            max-height: 100%;
         }
 
-        /* 成功反馈区：固定预留 80px */
-        #footer {
+        /* 底部成功区：固定高度且优先级高 */
+        #success-footer {
             height: 80px;
             flex-shrink: 0;
             display: flex;
             justify-content: center;
             align-items: center;
+            background: var(--bg);
             z-index: 10;
         }
 
-        #success-msg {
-            font-size: 32px;
+        #success-text {
+            font-size: 30px;
             font-weight: bold;
-            color: var(--success-color);
-            opacity: 0;
-            transform: scale(0.5);
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: var(--success);
+            visibility: hidden; /* 使用 visibility 避免重排 */
+            transform: scale(0.8);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        #success-text.show { visibility: visible; transform: scale(1); }
 
-        #success-msg.show { opacity: 1; transform: scale(1); }
-
-        /* 显示原图遮罩层 */
+        /* 原图预览遮罩 */
         #mask {
-            display: none;
-            position: fixed;
-            top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.85);
-            z-index: 100;
-            justify-content: center;
-            align-items: center;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100;
+            justify-content: center; align-items: center;
         }
         #mask img { max-width: 90%; max-height: 80%; border: 2px solid white; object-fit: contain; }
         #close-mask {
-            position: absolute;
-            top: 20px; right: 20px;
-            width: 40px; height: 40px;
-            background: white; border-radius: 50%;
+            position: absolute; top: 30px; right: 30px;
+            width: 40px; height: 40px; background: white; border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
             font-size: 24px; font-weight: bold; cursor: pointer;
         }
@@ -129,310 +110,276 @@
 </head>
 <body>
 
-<div class="container">
-    <div id="header"><h2>拼图小游戏，版本 1.9</h2></div>
-    
-    <div id="controls">
-        <div class="row">
-            <input type="file" id="file-input" accept="image/*" style="display:none">
-            <button onclick="document.getElementById('file-input').click()">选择图片</button>
-            <button id="btn-origin" onclick="toggleMask(true)">显示原图</button>
+<div class="app-container">
+    <div id="ui-header">
+        <h2>拼图小游戏，版本 2.0</h2>
+        <div class="btn-group">
+            <input type="file" id="img-input" accept="image/*" style="display:none">
+            <button onclick="document.getElementById('img-input').click()">选择图片</button>
+            <button id="origin-btn" onclick="toggleMask(true)">显示原图</button>
         </div>
-    </div>
-
-    <div id="settings">
-        <div class="row">
+        <div class="btn-group">
             <select id="diff-select">
-                <option value="3">3×3</option>
-                <option value="5">5×5</option>
-                <option value="8">8×8</option>
+                <option value="3">3 × 3</option>
+                <option value="5">5 × 5</option>
+                <option value="8">8 × 8</option>
             </select>
-            <button onclick="startGame()">开始游戏</button>
-            <button onclick="startGame()">重新开始</button>
+            <button onclick="initGame()">开始游戏</button>
+            <button onclick="initGame()">重新开始</button>
         </div>
     </div>
 
-    <div id="game-area">
-        <canvas id="gameCanvas"></canvas>
+    <div id="game-container">
+        <canvas id="puzzleCanvas"></canvas>
     </div>
 
-    <div id="footer">
-        <div id="success-msg">拼图成功</div>
+    <div id="success-footer">
+        <div id="success-text">拼图成功</div>
     </div>
 </div>
 
 <div id="mask">
     <div id="close-mask" onclick="toggleMask(false)">×</div>
-    <img id="origin-preview">
+    <img id="mask-img" src="" alt="原图预览">
 </div>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.getElementById('puzzleCanvas');
     const ctx = canvas.getContext('2d');
-    const fileInput = document.getElementById('file-input');
-    const btnOrigin = document.getElementById('btn-origin');
-    const successMsg = document.getElementById('success-msg');
+    const imgInput = document.getElementById('img-input');
+    const originBtn = document.getElementById('origin-btn');
+    const successText = document.getElementById('success-text');
     const diffSelect = document.getElementById('diff-select');
-    const originPreview = document.getElementById('origin-preview');
+    const maskImg = document.getElementById('mask-img');
 
     let img = new Image();
     let pieces = [];
-    let side = 3; // 难度
-    let pW, pH; // 碎片尺寸
+    let side = 3;
+    let pW, pH; 
     let dragItem = null;
     let isDragging = false;
     let mousePos = { x: 0, y: 0 };
     let hoverIdx = -1;
     let confetti = [];
-    let gameWon = false;
+    let isWon = false;
 
-    // 1. 选择图片逻辑
-    fileInput.onchange = (e) => {
+    // 1. 图片加载与视口挤压算法
+    imgInput.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (ev) => {
             img.onload = () => {
-                btnOrigin.style.display = 'block';
-                originPreview.src = img.src;
-                resizeCanvas();
-                startGame();
+                originBtn.style.display = 'block';
+                maskImg.src = img.src;
+                initGame();
             };
-            img.src = event.target.result;
+            img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     };
 
-    // 2. 核心算法：视口自适应缩放
-    function resizeCanvas() {
+    function adaptiveResize() {
         if (!img.src) return;
-
-        // 获取顶部和底部固定高度
-        const topH = document.getElementById('header').offsetHeight + 
-                     document.getElementById('controls').offsetHeight + 
-                     document.getElementById('settings').offsetHeight;
-        const bottomH = 80; // 成功反馈区固定 80px
         
-        const maxW = window.innerWidth - 40; // 左右留白 20px * 2
-        const maxH = window.innerHeight - topH - bottomH - 40; // 上下边距合计 40px
+        // 获取容器实时尺寸
+        const container = document.getElementById('game-container');
+        const maxW = container.clientWidth - 20; 
+        const maxH = container.clientHeight - 20;
 
-        const ratio = img.width / img.height;
+        const imgRatio = img.width / img.height;
 
-        let canvasW = maxW;
-        let canvasH = canvasW / ratio;
+        let targetW = maxW;
+        let targetH = targetW / imgRatio;
 
-        // 如果计算出的高度超过可用高度，则以高度为基准缩小宽度
-        if (canvasH > maxH) {
-            canvasH = maxH;
-            canvasW = canvasH * ratio;
+        // 核心挤压：如果高度溢出容器，则反向以高度为基准
+        if (targetH > maxH) {
+            targetH = maxH;
+            targetW = targetH * imgRatio;
         }
 
-        canvas.width = canvasW;
-        canvas.height = canvasH;
+        canvas.width = targetW;
+        canvas.height = targetH;
         pW = canvas.width / side;
         pH = canvas.height / side;
     }
 
-    // 窗口大小改变时重新计算
-    window.onresize = () => {
+    window.addEventListener('resize', () => {
         if (img.src) {
-            resizeCanvas();
+            adaptiveResize();
             render();
         }
-    };
+    });
 
-    function toggleMask(show) {
-        document.getElementById('mask').style.display = show ? 'flex' : 'none';
-    }
+    function toggleMask(show) { document.getElementById('mask').style.display = show ? 'flex' : 'none'; }
 
-    // 3. 游戏初始化
-    function startGame() {
+    // 2. 游戏核心逻辑
+    function initGame() {
         if (!img.src) return;
-        gameWon = false;
-        successMsg.classList.remove('show');
+        isWon = false;
+        successText.classList.remove('show');
         confetti = [];
         side = parseInt(diffSelect.value);
-        resizeCanvas();
+        
+        adaptiveResize();
 
         pieces = [];
         for (let i = 0; i < side * side; i++) {
             pieces.push({ orig: i, curr: i, locked: false });
         }
 
-        // 洗牌算法：确保打乱且不立即获胜
+        // 打乱顺序
         do {
             for (let i = pieces.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [pieces[i].curr, pieces[j].curr] = [pieces[j].curr, pieces[i].curr];
             }
-        } while (isComplete());
+        } while (checkWin());
 
-        updateLocks();
-        requestAnimationFrame(gameLoop);
+        updateGameStatus();
+        requestAnimationFrame(mainLoop);
     }
 
-    function isComplete() {
+    function checkWin() {
         return pieces.every(p => p.curr === p.orig);
     }
 
-    function updateLocks() {
-        let allLocked = true;
+    function updateGameStatus() {
+        let winCount = 0;
         pieces.forEach(p => {
-            if (p.curr === p.orig) p.locked = true;
-            else { p.locked = false; allLocked = false; }
+            if (p.curr === p.orig) {
+                p.locked = true;
+                winCount++;
+            } else {
+                p.locked = false;
+            }
         });
-        if (allLocked && !gameWon) {
-            gameWon = true;
-            successMsg.classList.add('show');
-            createConfetti();
+        
+        if (winCount === side * side && pieces.length > 0 && !isWon) {
+            isWon = true;
+            successText.classList.add('show');
+            spawnConfetti();
         }
     }
 
-    // 4. 交互逻辑：拖拽交换
-    function getEventPos(e) {
+    // 3. 交互逻辑（拖拽与触摸适配）
+    function getCoords(e) {
         const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
     }
 
-    canvas.addEventListener('mousedown', handleStart);
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); }, {passive: false});
+    canvas.addEventListener('mousedown', startAction);
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startAction(e); }, { passive: false });
 
-    function handleStart(e) {
-        if (gameWon) return;
-        const pos = getEventPos(e);
+    function startAction(e) {
+        if (isWon) return;
+        const pos = getCoords(e);
         const col = Math.floor(pos.x / pW);
         const row = Math.floor(pos.y / pH);
         const idx = row * side + col;
 
-        const p = pieces.find(item => item.curr === idx);
-        if (p && !p.locked) {
-            dragItem = p;
+        const piece = pieces.find(p => p.curr === idx);
+        if (piece && !piece.locked) {
+            dragItem = piece;
             isDragging = true;
             mousePos = pos;
         }
     }
 
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); handleMove(e); }, {passive: false});
+    window.addEventListener('mousemove', moveAction);
+    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); moveAction(e); }, { passive: false });
 
-    function handleMove(e) {
+    function moveAction(e) {
         if (!isDragging) return;
-        mousePos = getEventPos(e);
-        const col = Math.floor(mousePos.x / pW);
-        const row = Math.floor(mousePos.y / pH);
-        if (col >= 0 && col < side && row >= 0 && row < side) {
-            hoverIdx = row * side + col;
-        } else {
-            hoverIdx = -1;
-        }
+        mousePos = getCoords(e);
+        const c = Math.floor(mousePos.x / pW), r = Math.floor(mousePos.y / pH);
+        hoverIdx = (c >= 0 && c < side && r >= 0 && r < side) ? r * side + c : -1;
     }
 
-    window.addEventListener('mouseup', handleEnd);
-    window.addEventListener('touchend', handleEnd);
+    window.addEventListener('mouseup', endAction);
+    window.addEventListener('touchend', endAction);
 
-    function handleEnd() {
+    function endAction() {
         if (!isDragging) return;
         if (hoverIdx !== -1) {
             const target = pieces.find(p => p.curr === hoverIdx);
-            // 目标碎片必须存在且未被锁定
             if (target && !target.locked && target !== dragItem) {
                 const temp = dragItem.curr;
                 dragItem.curr = target.curr;
                 target.curr = temp;
             }
         }
-        dragItem = null;
-        isDragging = false;
-        hoverIdx = -1;
-        updateLocks();
+        dragItem = null; isDragging = false; hoverIdx = -1;
+        updateGameStatus();
     }
 
-    // 5. 渲染引擎
-    function gameLoop() {
+    // 4. 绘图引擎
+    function mainLoop() {
         render();
-        requestAnimationFrame(gameLoop);
+        requestAnimationFrame(mainLoop);
     }
 
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 绘制未被拖动的碎片
+        // 绘制底层拼图
         pieces.forEach(p => {
-            if (p === dragItem) return;
-            drawPiece(p);
+            if (p !== dragItem) drawPiece(p);
         });
 
-        // 绘制目标高亮
+        // 目标高亮
         if (isDragging && hoverIdx !== -1) {
-            const targetP = pieces.find(p => p.curr === hoverIdx);
-            if (targetP && !targetP.locked) {
-                ctx.strokeStyle = "rgba(0, 122, 255, 0.7)";
-                ctx.lineWidth = 4;
-                const tx = (hoverIdx % side) * pW;
-                const ty = Math.floor(hoverIdx / side) * pH;
-                ctx.strokeRect(tx + 2, ty + 2, pW - 4, pH - 4);
+            const hoverPiece = pieces.find(p => p.curr === hoverIdx);
+            if (hoverPiece && !hoverPiece.locked) {
+                ctx.strokeStyle = "rgba(0, 122, 255, 0.8)";
+                ctx.lineWidth = 5;
+                ctx.strokeRect((hoverIdx % side) * pW + 2, Math.floor(hoverIdx / side) * pH + 2, pW - 4, pH - 4);
             }
         }
 
-        // 绘制正在拖动的碎片（置顶且阴影）
+        // 绘制拖拽块
         if (dragItem) {
             ctx.save();
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.4)";
             ctx.globalAlpha = 0.8;
-            drawAt(dragItem, mousePos.x - pW / 2, mousePos.y - pH / 2);
+            const sx = (dragItem.orig % side) * (img.width / side);
+            const sy = Math.floor(dragItem.orig / side) * (img.height / side);
+            ctx.drawImage(img, sx, sy, img.width/side, img.height/side, mousePos.x - pW/2, mousePos.y - pH/2, pW, pH);
             ctx.restore();
         }
 
-        // 绘制纸屑特效
+        // 绘制五彩纸屑
         if (confetti.length > 0) {
             confetti.forEach((c, i) => {
-                c.y += c.speed;
-                c.x += Math.sin(c.angle) * 2;
-                c.angle += 0.1;
+                c.y += c.vy; c.x += Math.cos(c.a) * 2;
                 ctx.fillStyle = c.color;
-                ctx.beginPath();
-                ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(c.x, c.y, c.s, 0, Math.PI * 2); ctx.fill();
                 if (c.y > canvas.height) confetti.splice(i, 1);
             });
         }
     }
 
     function drawPiece(p) {
-        const x = (p.curr % side) * pW;
-        const y = Math.floor(p.curr / side) * pH;
-        drawAt(p, x, y);
-    }
-
-    function drawAt(p, x, y) {
+        const x = (p.curr % side) * pW, y = Math.floor(p.curr / side) * pH;
         const sx = (p.orig % side) * (img.width / side);
         const sy = Math.floor(p.orig / side) * (img.height / side);
-        const sw = img.width / side;
-        const sh = img.height / side;
-
-        // 绘制图片（防止拉伸）
-        ctx.drawImage(img, sx, sy, sw, sh, x, y, pW, pH);
-
-        // 边框锁定逻辑：正确位置绿色，否则白色
+        
+        ctx.drawImage(img, sx, sy, img.width/side, img.height/side, x, y, pW, pH);
+        
         ctx.strokeStyle = p.locked ? "lime" : "white";
         ctx.lineWidth = p.locked ? 4 : 1;
         ctx.strokeRect(x, y, pW, pH);
     }
 
-    // 6. 特效：五彩纸屑
-    function createConfetti() {
-        const colors = ['#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f'];
-        for (let i = 0; i < 100; i++) {
+    function spawnConfetti() {
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+        for (let i = 0; i < 120; i++) {
             confetti.push({
-                x: Math.random() * canvas.width,
-                y: -10,
-                size: Math.random() * 5 + 2,
+                x: Math.random() * canvas.width, y: -20,
+                s: Math.random() * 4 + 2,
                 color: colors[Math.floor(Math.random() * colors.length)],
-                speed: Math.random() * 3 + 2,
-                angle: Math.random() * Math.PI * 2
+                vy: Math.random() * 3 + 2, a: Math.random() * 2 * Math.PI
             });
         }
     }
