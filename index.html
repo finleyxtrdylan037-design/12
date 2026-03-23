@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>拼图小游戏 v2.1 高清版</title>
+    <title>拼图小游戏 v2.2 智能边框高清版</title>
     <style>
         :root {
             --primary: #007aff;
@@ -13,7 +13,7 @@
             --footer-h: 80px;
         }
 
-        /* 视口锁定：100dvh 适配移动端工具栏 */
+        /* 视口锁定：100dvh 解决移动端工具栏遮挡 */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
         body, html {
@@ -33,11 +33,12 @@
             padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
         }
 
-        /* 顶部 UI */
+        /* 顶部 UI 区 */
         #header-ui {
             flex-shrink: 0;
             padding: 10px 5px;
             text-align: center;
+            z-index: 10;
         }
         h2 { margin: 0 0 10px; font-size: 1.2rem; color: #333; }
 
@@ -52,7 +53,7 @@
         
         #origin-btn { display: none; background: var(--primary); color: white; border: none; }
 
-        /* 中部游戏区：动态挤压 */
+        /* 中部核心游戏区：动态挤压算法 */
         #game-zone {
             flex: 1;
             display: flex;
@@ -92,7 +93,7 @@
         }
         #success-msg.visible { opacity: 1; transform: translateY(0); }
 
-        /* 蒙层原图 */
+        /* 预览遮罩 */
         #modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 1000;
@@ -111,7 +112,7 @@
 
 <div class="app-wrapper">
     <div id="header-ui">
-        <h2>拼图小游戏，版本 2.1</h2>
+        <h2>拼图小游戏，版本 2.2</h2>
         <div class="control-row">
             <input type="file" id="img-loader" accept="image/*" style="display:none">
             <button onclick="document.getElementById('img-loader').click()">选择图片</button>
@@ -164,7 +165,7 @@
     let particles = [];
     let finished = false;
 
-    // 1. 高清重置算法：适配 Retina 屏幕
+    // 1. 高清重置与比例适配算法
     imgLoader.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -184,8 +185,12 @@
         if (!sourceImg.src) return;
         
         const zone = document.getElementById('game-zone');
-        const maxLW = zone.clientWidth - 20; 
-        const maxLH = zone.clientHeight - 20;
+        const header = document.getElementById('header-ui');
+        const footer = document.getElementById('footer-ui');
+        
+        // 核心：计算视口挤压后的可用空间
+        const maxLW = window.innerWidth - 40; 
+        const maxLH = window.innerHeight - header.offsetHeight - footer.offsetHeight - 40;
 
         const ratio = sourceImg.width / sourceImg.height;
 
@@ -197,17 +202,15 @@
             lW = lH * ratio;
         }
 
-        // 高清化设置核心
+        // 高清化物理尺寸设置
         cvs.width = lW * dpr;
         cvs.height = lH * dpr;
         cvs.style.width = lW + 'px';
         cvs.style.height = lH + 'px';
 
-        // 设置全局渲染平滑度
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         
-        // 核心：缩放上下文
         ctx.resetTransform();
         ctx.scale(dpr, dpr);
     }
@@ -236,7 +239,7 @@
             grid.push({ orig: i, curr: i, locked: false });
         }
 
-        // 随机洗牌
+        // 打乱
         do {
             for (let i = grid.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -244,13 +247,13 @@
             }
         } while (isSolved());
 
-        refreshLocks();
+        refreshStatus();
         requestAnimationFrame(loop);
     }
 
     function isSolved() { return grid.every(p => p.curr === p.orig); }
 
-    function refreshLocks() {
+    function refreshStatus() {
         let win = true;
         grid.forEach(p => {
             if (p.curr === p.orig) p.locked = true;
@@ -263,7 +266,7 @@
         }
     }
 
-    // 3. 增强型交互适配
+    // 3. 增强交互
     function getCursorPos(e) {
         const rect = cvs.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
@@ -302,18 +305,18 @@
     function onEnd() {
         if (!isDragging) return;
         if (targetIdx !== -1) {
-            const targetPiece = grid.find(p => p.curr === targetIdx);
-            if (targetPiece && !targetPiece.locked && targetPiece !== activePiece) {
+            const tp = grid.find(p => p.curr === targetIdx);
+            if (tp && !tp.locked && tp !== activePiece) {
                 const tmp = activePiece.curr;
-                activePiece.curr = targetPiece.curr;
-                targetPiece.curr = tmp;
+                activePiece.curr = tp.curr;
+                tp.curr = tmp;
             }
         }
         activePiece = null; isDragging = false; targetIdx = -1;
-        refreshLocks();
+        refreshStatus();
     }
 
-    // 4. 渲染循环
+    // 4. 智能边框渲染系统 (v2.2 核心)
     function loop() {
         render();
         requestAnimationFrame(loop);
@@ -323,12 +326,12 @@
         ctx.clearRect(0, 0, lW, lH);
         const cw = lW / size, ch = lH / size;
 
-        // 1. 绘制静态层
+        // 1. 绘制底层静态拼图
         grid.forEach(p => {
-            if (p !== activePiece) drawPiece(p, cw, ch);
+            if (p !== activePiece) paintFragment(p, cw, ch);
         });
 
-        // 2. 目标高亮
+        // 2. 目标预览高亮
         if (isDragging && targetIdx !== -1) {
             const tp = grid.find(p => p.curr === targetIdx);
             if (tp && !tp.locked) {
@@ -340,16 +343,20 @@
             }
         }
 
-        // 3. 绘制拖拽块层
+        // 3. 绘制悬浮拖拽块
         if (activePiece) {
             ctx.save();
-            ctx.shadowBlur = 15; ctx.shadowColor = "rgba(0,0,0,0.4)";
+            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.4)";
             ctx.globalAlpha = 0.85;
-            paintFragment(activePiece, cursor.x - cw/2, cursor.y - ch/2, cw, ch);
+            drawPieceContent(activePiece, cursor.x - cw/2, cursor.y - ch/2, cw, ch);
+            // 拖拽块始终显示完整边框
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cursor.x - cw/2, cursor.y - ch/2, cw, ch);
             ctx.restore();
         }
 
-        // 4. 特效层
+        // 4. 特效系统
         if (particles.length > 0) {
             particles.forEach((p, i) => {
                 p.y += p.v; p.x += Math.sin(p.a) * 2;
@@ -360,32 +367,77 @@
         }
     }
 
-    function drawPiece(p, cw, ch) {
-        paintFragment(p, (p.curr % size) * cw, Math.floor(p.curr / size) * ch, cw, ch);
+    function paintFragment(p, cw, ch) {
+        const x = (p.curr % size) * cw;
+        const y = Math.floor(p.curr / size) * ch;
+        drawPieceContent(p, x, y, cw, ch);
+
+        // 智能邻域边框逻辑
+        if (p.locked) {
+            ctx.save();
+            ctx.strokeStyle = "lime";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+
+            const row = Math.floor(p.curr / size);
+            const col = p.curr % size;
+
+            // 检测上邻
+            let upLocked = false;
+            if (row > 0) {
+                const up = grid.find(item => item.curr === p.curr - size);
+                if (up && up.locked) upLocked = true;
+            }
+            if (!upLocked) { ctx.moveTo(x, y); ctx.lineTo(x + cw, y); }
+
+            // 检测下邻
+            let downLocked = false;
+            if (row < size - 1) {
+                const down = grid.find(item => item.curr === p.curr + size);
+                if (down && down.locked) downLocked = true;
+            }
+            if (!downLocked) { ctx.moveTo(x, y + ch); ctx.lineTo(x + cw, y + ch); }
+
+            // 检测左邻
+            let leftLocked = false;
+            if (col > 0) {
+                const left = grid.find(item => item.curr === p.curr - 1);
+                if (left && left.locked) leftLocked = true;
+            }
+            if (!leftLocked) { ctx.moveTo(x, y); ctx.lineTo(x, y + ch); }
+
+            // 检测右邻
+            let rightLocked = false;
+            if (col < size - 1) {
+                const right = grid.find(item => item.curr === p.curr + 1);
+                if (right && right.locked) rightLocked = true;
+            }
+            if (!rightLocked) { ctx.moveTo(x + cw, y); ctx.lineTo(x + cw, y + ch); }
+
+            ctx.stroke();
+            ctx.restore();
+        } else {
+            // 未锁定的显示细白线
+            ctx.strokeStyle = "rgba(255,255,255,0.8)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, cw, ch);
+        }
     }
 
-    function paintFragment(p, x, y, cw, ch) {
+    function drawPieceContent(p, x, y, cw, ch) {
         const sw = sourceImg.width / size;
         const sh = sourceImg.height / size;
         const sx = (p.orig % size) * sw;
         const sy = Math.floor(p.orig / size) * sh;
-
-        // 渲染图片
         ctx.drawImage(sourceImg, sx, sy, sw, sh, x, y, cw, ch);
-
-        // 绘制边框：锁定绿色，默认白色
-        ctx.strokeStyle = p.locked ? "lime" : "white";
-        ctx.lineWidth = p.locked ? 3 : 1;
-        ctx.strokeRect(x, y, cw, ch);
     }
 
     function triggerConfetti() {
-        const palette = ['#FF3B30', '#4CD964', '#007AFF', '#FFCC00', '#FF9500', '#5856D6'];
+        const colors = ['#FF3B30', '#4CD964', '#007AFF', '#FFCC00', '#FF9500', '#5856D6'];
         for (let i = 0; i < 150; i++) {
             particles.push({
-                x: Math.random() * lW, y: -20,
-                s: Math.random() * 4 + 2,
-                c: palette[Math.floor(Math.random() * palette.length)],
+                x: Math.random() * lW, y: -20, s: Math.random() * 4 + 2,
+                c: colors[Math.floor(Math.random() * colors.length)],
                 v: Math.random() * 3 + 3, a: Math.random() * 6
             });
         }
