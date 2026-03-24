@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>拼图小游戏 v2.4</title>
+    <title>拼图小游戏 v2.5 旗舰版</title>
     <style>
         :root {
             --primary: #007aff;
@@ -30,7 +30,7 @@
             padding: env(safe-area-inset-top) 8px env(safe-area-inset-bottom) 8px;
         }
 
-        /* 顶部 UI：严格三行 */
+        /* 顶部 UI 严格三行控制 */
         #header-ui { flex-shrink: 0; padding-top: 5px; }
         .ui-row { 
             display: flex; align-items: center; justify-content: space-between; 
@@ -40,14 +40,13 @@
         .lvl-info { font-size: 0.85rem; color: var(--primary); font-weight: bold; flex: 1; text-align: center; }
 
         button, select {
-            padding: 4px 8px; font-size: 13px; border-radius: 8px;
+            padding: 4px 10px; font-size: 13px; border-radius: 8px;
             border: 1px solid #d1d1d6; background: var(--white); cursor: pointer;
             white-space: nowrap;
         }
         button:active { opacity: 0.7; transform: scale(0.95); }
         
-        /* 动态按钮状态 */
-        #btn-prev { display: none; } /* 初始隐藏 */
+        #btn-prev { display: none; } /* 激活后显示 */
         #btn-origin { visibility: hidden; background: var(--primary); color: white; border: none; }
 
         /* 游戏区域 */
@@ -74,7 +73,7 @@
         }
         #success-msg.show { opacity: 1; transform: translateY(0); }
 
-        /* 原图遮罩 */
+        /* 蒙层 */
         #modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 1000;
@@ -93,9 +92,9 @@
 <div class="app-container">
     <div id="header-ui">
         <div class="ui-row">
-            <span class="title">拼图 v2.4</span>
+            <span class="title">拼图 v2.5</span>
             <span id="lvl-txt" class="lvl-info">加载中...</span>
-            <button onclick="document.getElementById('f-in').click()">选择图片</button>
+            <button onclick="document.getElementById('f-in').click()">本地上传</button>
             <input type="file" id="f-in" accept="image/*" style="display:none">
         </div>
         <div class="ui-row" style="justify-content: center; gap: 10px;">
@@ -128,54 +127,72 @@
 </div>
 
 <script>
-    // 1. 50关图库 (避开 Picsum 无效 ID)
-    const imgIds = [
-        10,11,12,13,14,15,16,17,18,19,
-        20,21,22,23,24,25,26,27,28,29,
-        30,31,32,33,34,35,36,37,38,39,
-        40,41,42,43,44,45,46,47,48,49,
-        50,51,52,53,54,55,56,57,58,59
-    ];
+    // 1. 预加载系统配置
+    const imgPool = new Map();
+    const totalLevels = 50;
+    const imgIds = Array.from({length: totalLevels}, (_, i) => [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59][i] || 100 + i);
     let curIdx = 0;
-    let hasUsedNav = false; // 标记是否点击过切换
+    let hasUsedNav = false;
 
     const cvs = document.getElementById('cvs');
     const ctx = cvs.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     
-    let img = new Image();
+    let currentImg = null;
     let pieces = [];
     let size = 3;
     let lW, lH;
-    let dragP = null;
+    let dragGroup = []; // 存储当前拖拽的碎片组合
     let isDragging = false;
-    let pointer = { x: 0, y: 0 };
+    let pointerOffset = { x: 0, y: 0 }; // 记录初始点击相对于碎片的偏移
+    let pointerPos = { x: 0, y: 0 };
     let hoverIdx = -1;
     let confetti = [];
     let isWon = false;
     let autoNextTimer = null;
 
-    // 初始化
-    window.onload = () => loadLevel(0);
+    // 2. 预加载逻辑：后台静默加载后续关卡
+    async function preloadImages(startIdx) {
+        for (let i = 0; i <= 2; i++) {
+            const idx = (startIdx + i) % totalLevels;
+            if (!imgPool.has(idx)) {
+                const imgObj = new Image();
+                imgObj.crossOrigin = "Anonymous";
+                imgObj.src = `https://picsum.photos/id/${imgIds[idx]}/800/1000`;
+                imgPool.set(idx, imgObj);
+            }
+        }
+    }
 
-    function loadLevel(idx) {
+    async function loadLevel(idx) {
         clearTimeout(autoNextTimer);
-        curIdx = (idx + imgIds.length) % imgIds.length;
+        curIdx = (idx + totalLevels) % totalLevels;
+        document.getElementById('lvl-txt').innerText = `第 ${curIdx + 1}/${totalLevels} 关`;
         
-        // 更新 UI 状态
-        document.getElementById('lvl-txt').innerText = `第 ${curIdx + 1}/50 关`;
         if (curIdx > 0 || hasUsedNav) {
             document.getElementById('btn-prev').style.display = 'block';
             hasUsedNav = true;
         }
 
-        img.crossOrigin = "Anonymous";
-        img.onload = () => {
-            document.getElementById('modal-img').src = img.src;
+        // 如果图片未在预加载池中，则现场创建
+        if (!imgPool.has(curIdx)) {
+            const imgObj = new Image();
+            imgObj.crossOrigin = "Anonymous";
+            imgObj.src = `https://picsum.photos/id/${imgIds[curIdx]}/800/1000`;
+            imgPool.set(curIdx, imgObj);
+        }
+
+        currentImg = imgPool.get(curIdx);
+        
+        const setup = () => {
+            document.getElementById('modal-img').src = currentImg.src;
             document.getElementById('btn-origin').style.visibility = 'visible';
             initGame(true);
+            preloadImages(curIdx + 1); // 触发后续加载
         };
-        img.src = `https://picsum.photos/id/${imgIds[curIdx]}/800/1000`;
+
+        if (currentImg.complete) setup();
+        else currentImg.onload = setup;
     }
 
     function changeLevel(step) {
@@ -188,11 +205,13 @@
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
-            img.onload = () => {
+            const customImg = new Image();
+            customImg.onload = () => {
+                currentImg = customImg;
                 document.getElementById('lvl-txt').innerText = "自定义关卡";
                 initGame(true);
             };
-            img.src = ev.target.result;
+            customImg.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     };
@@ -201,7 +220,7 @@
         const area = document.getElementById('game-area');
         const maxLW = area.clientWidth - 10;
         const maxLH = area.clientHeight - 10;
-        const ratio = img.width / img.height;
+        const ratio = currentImg.width / currentImg.height;
 
         lW = maxLW; lH = lW / ratio;
         if (lH > maxLH) { lH = maxLH; lW = lH * ratio; }
@@ -215,7 +234,7 @@
     }
 
     function initGame(shuffle = true) {
-        if (!img.src) return;
+        if (!currentImg) return;
         isWon = false;
         clearTimeout(autoNextTimer);
         document.getElementById('success-msg').classList.remove('show');
@@ -225,7 +244,7 @@
 
         pieces = [];
         for (let i = 0; i < size * size; i++) {
-            pieces.push({ orig: i, curr: i, locked: false });
+            pieces.push({ orig: i, curr: i, locked: false, groupId: -1 });
         }
 
         if (shuffle) {
@@ -236,27 +255,69 @@
                 }
             } while (checkWin());
         }
-        refreshStatus();
+        updateLogic();
         render();
     }
 
     function checkWin() { return pieces.every(p => p.curr === p.orig); }
 
-    function refreshStatus() {
+    // 3. 碎片组合逻辑核心：判定相邻碎片是否具有相对正确的逻辑位置
+    function updateLogic() {
         let win = true;
+        // 先重置所有非锁定碎片的状态
         pieces.forEach(p => {
+            p.groupId = -1;
             if (p.curr === p.orig) p.locked = true;
             else { p.locked = false; win = false; }
         });
+
+        // 计算黄色组合：未锁定碎片如果位置相对正确，则成组
+        // 使用简单的并查集或邻域扫描
+        for (let i = 0; i < pieces.length; i++) {
+            const p1 = pieces[i];
+            if (p1.locked) continue;
+            
+            const r1 = Math.floor(p1.curr / size);
+            const c1 = p1.curr % size;
+            const or1 = Math.floor(p1.orig / size);
+            const oc1 = p1.orig % size;
+
+            for (let j = i + 1; j < pieces.length; j++) {
+                const p2 = pieces[j];
+                if (p2.locked) continue;
+
+                const r2 = Math.floor(p2.curr / size);
+                const c2 = p2.curr % size;
+                const or2 = Math.floor(p2.orig / size);
+                const oc2 = p2.orig % size;
+
+                // 判断相对位置是否一致
+                const currDR = r2 - r1;
+                const currDC = c2 - c1;
+                const origDR = or2 - or1;
+                const origDC = oc2 - oc1;
+
+                // 如果在网格中相邻且相对原始位置一致
+                if (currDR === origDR && currDC === origDC && (Math.abs(currDR) + Math.abs(currDC) === 1)) {
+                    // 标记组合（此处简化处理，使用原始索引作为组ID前缀）
+                    if (p1.groupId === -1 && p2.groupId === -1) {
+                        p1.groupId = p2.groupId = Math.min(p1.orig, p2.orig);
+                    } else if (p1.groupId !== -1 || p2.groupId !== -1) {
+                        const newId = p1.groupId !== -1 ? p1.groupId : p2.groupId;
+                        const oldId = p1.groupId !== -1 ? p2.groupId : p1.groupId;
+                        p1.groupId = p2.groupId = newId;
+                        if(oldId !== -1) pieces.forEach(p => { if(p.groupId === oldId) p.groupId = newId; });
+                    }
+                }
+            }
+        }
+
         if (win && pieces.length > 0 && !isWon) {
             isWon = true;
             document.getElementById('success-msg').classList.add('show');
-            document.getElementById('btn-prev').style.display = 'block'; // 完成一关也永久显示上一关
+            document.getElementById('btn-prev').style.display = 'block';
             spawnConfetti();
-            // 3秒后自动下一关
-            autoNextTimer = setTimeout(() => {
-                if(isWon) changeLevel(1);
-            }, 3500);
+            autoNextTimer = setTimeout(() => { if(isWon) changeLevel(1); }, 3500);
         }
     }
 
@@ -266,71 +327,157 @@
         return { x: t.clientX - rect.left, y: t.clientY - rect.top };
     }
 
-    function start(e) {
-        if (isWon && confetti.length === 0) return; 
+    // 4. 协同移动与碰撞裁剪逻辑
+    function handleStart(e) {
+        if (isWon) return; 
         const p = getPos(e);
         const cw = lW / size, ch = lH / size;
         const idx = Math.floor(p.y / ch) * size + Math.floor(p.x / cw);
         const target = pieces.find(item => item.curr === idx);
+        
         if (target && !target.locked) {
-            dragP = target; isDragging = true; pointer = p;
+            isDragging = true;
+            pointerPos = p;
+            
+            // 判定是否属于黄色组合
+            if (target.groupId !== -1) {
+                dragGroup = pieces.filter(item => item.groupId === target.groupId);
+            } else {
+                dragGroup = [target];
+            }
+            
+            // 记录相对于主碎片的偏移（此处主碎片为点击的碎片）
+            dragGroup.forEach(item => {
+                item._tempCurr = item.curr; // 暂存位置
+            });
         }
     }
 
-    function move(e) {
+    function handleMove(e) {
         if (!isDragging) return;
-        pointer = getPos(e);
+        pointerPos = getPos(e);
         const cw = lW / size, ch = lH / size;
-        const col = Math.floor(pointer.x / cw), row = Math.floor(pointer.y / ch);
-        hoverIdx = (col >= 0 && col < size && row >= 0 && row < size) ? row * size + col : -1;
+        
+        // 计算当前 hover 的目标格子（针对主碎片）
+        const col = Math.floor(pointerPos.x / cw);
+        const row = Math.floor(pointerPos.y / ch);
+        
+        if (col >= 0 && col < size && row >= 0 && row < size) {
+            hoverIdx = row * size + col;
+        } else {
+            hoverIdx = -1;
+        }
     }
 
-    function end() {
+    function handleEnd() {
         if (!isDragging) return;
+        
+        const cw = lW / size, ch = lH / size;
         if (hoverIdx !== -1) {
-            const tp = pieces.find(p => p.curr === hoverIdx);
-            if (tp && !tp.locked && tp !== dragP) {
-                const tmp = dragP.curr;
-                dragP.curr = tp.curr;
-                tp.curr = tmp;
+            // 计算位移量
+            const mainPiece = dragGroup.find(p => Math.floor(pointerPos.y / ch) * size + Math.floor(pointerPos.x / cw) === hoverIdx) || dragGroup[0];
+            const startCol = mainPiece._tempCurr % size;
+            const startRow = Math.floor(mainPiece._tempCurr / size);
+            const targetCol = hoverIdx % size;
+            const targetRow = Math.floor(hoverIdx / size);
+            
+            const dr = targetRow - startRow;
+            const dc = targetCol - startCol;
+
+            // 裁剪/限制逻辑：确保整个组合不超出画布
+            let minC = size, maxC = -1, minR = size, maxR = -1;
+            dragGroup.forEach(p => {
+                const c = (p._tempCurr % size) + dc;
+                const r = Math.floor(p._tempCurr / size) + dr;
+                minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+                minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+            });
+
+            let finalDc = dc, finalDr = dr;
+            if (minC < 0) finalDc -= minC;
+            if (maxC >= size) finalDc -= (maxC - size + 1);
+            if (minR < 0) finalDr -= minR;
+            if (maxR >= size) finalDr -= (maxR - size + 1);
+
+            // 执行交换/放置
+            // 此处采用简单交换逻辑：组合覆盖到的位置，如果位置上有非组合碎片，则与组合对应碎片交换
+            const groupTargetIndices = dragGroup.map(p => {
+                const nc = (p._tempCurr % size) + finalDc;
+                const nr = Math.floor(p._tempCurr / size) + finalDr;
+                return nr * size + nc;
+            });
+
+            // 检测目标位置是否有锁定碎片，如果有，则移动无效（组合不能覆盖锁定区）
+            const hasCollision = groupTargetIndices.some(idx => {
+                const pAtIdx = pieces.find(p => p.curr === idx);
+                return pAtIdx && pAtIdx.locked;
+            });
+
+            if (!hasCollision) {
+                // 批量收集需要被置换出的碎片
+                const swappedPieces = pieces.filter(p => !dragGroup.includes(p) && groupTargetIndices.includes(p.curr));
+                
+                // 暂时移开
+                swappedPieces.forEach(p => p.curr = -100); 
+                
+                dragGroup.forEach((p, i) => {
+                    p.curr = groupTargetIndices[i];
+                });
+
+                // 将置换出的碎片放入空位（此处简化：找出当前所有空位）
+                const availableIndices = [];
+                for(let i=0; i<size*size; i++) {
+                    if(!pieces.find(p => p.curr === i)) availableIndices.push(i);
+                }
+                swappedPieces.forEach((p, i) => {
+                    p.curr = availableIndices[i];
+                });
             }
         }
-        dragP = null; isDragging = false; hoverIdx = -1;
-        refreshStatus();
+
+        dragGroup = []; isDragging = false; hoverIdx = -1;
+        updateLogic();
     }
 
-    cvs.addEventListener('mousedown', start);
-    cvs.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); }, {passive:false});
-    window.addEventListener('mousemove', move);
-    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); move(e); }, {passive:false});
-    window.addEventListener('mouseup', end);
-    window.addEventListener('touchend', end);
+    cvs.addEventListener('mousedown', handleStart);
+    cvs.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); }, {passive:false});
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); handleMove(e); }, {passive:false});
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchend', handleEnd);
 
+    // 5. 高性能渲染循环
     function render() {
         ctx.clearRect(0, 0, lW, lH);
         const cw = lW / size, ch = lH / size;
 
-        pieces.forEach(p => { if (p !== dragP) drawPiece(p, cw, ch); });
+        // 绘制未被拖拽的
+        pieces.forEach(p => { if (!dragGroup.includes(p)) drawPiece(p, cw, ch); });
 
-        if (isDragging && hoverIdx !== -1) {
-            const hp = pieces.find(p => p.curr === hoverIdx);
-            if (hp && !hp.locked) {
-                ctx.strokeStyle = "rgba(0, 122, 255, 0.8)";
-                ctx.lineWidth = 4;
-                ctx.strokeRect((hoverIdx % size) * cw + 2, Math.floor(hoverIdx / size) * ch + 2, cw - 4, ch - 4);
-            }
-        }
-
-        if (dragP) {
+        // 绘制拖拽组合
+        if (isDragging && dragGroup.length > 0) {
             ctx.save();
-            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.4)";
+            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.3)";
             ctx.globalAlpha = 0.8;
-            const x = pointer.x - cw/2, y = pointer.y - ch/2;
-            drawFrag(dragP, x, y, cw, ch);
-            ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.strokeRect(x,y,cw,ch);
+            
+            // 计算拖拽整体偏移
+            // 找到点击的碎片在组合中的初始位置
+            const refPiece = dragGroup[0];
+            const dx = pointerPos.x - ( (refPiece._tempCurr % size) * cw + cw/2 );
+            const dy = pointerPos.y - ( Math.floor(refPiece._tempCurr / size) * ch + ch/2 );
+
+            dragGroup.forEach(p => {
+                const ox = (p._tempCurr % size) * cw;
+                const oy = Math.floor(p._tempCurr / size) * ch;
+                drawFrag(p, ox + dx, oy + dy, cw, ch);
+                // 组合显示黄色细边框
+                ctx.strokeStyle = "yellow"; ctx.lineWidth = 2;
+                ctx.strokeRect(ox + dx, oy + dy, cw, ch);
+            });
             ctx.restore();
         }
 
+        // 纸屑
         if (confetti.length > 0) {
             confetti.forEach((c, i) => {
                 c.y += c.v; c.x += Math.sin(c.a) * 2;
@@ -346,29 +493,31 @@
         const x = (p.curr % size) * cw, y = Math.floor(p.curr / size) * ch;
         drawFrag(p, x, y, cw, ch);
 
+        // 边框逻辑
         if (p.locked) {
             ctx.save();
             ctx.strokeStyle = "lime"; ctx.lineWidth = 3;
             ctx.beginPath();
+            const check = (idx) => { const n = pieces.find(item => item.curr === idx); return n && n.locked; };
             const r = Math.floor(p.curr / size), c = p.curr % size;
-            const check = (idx) => {
-                const n = pieces.find(item => item.curr === idx);
-                return n && n.locked;
-            };
             if (r === 0 || !check(p.curr - size)) { ctx.moveTo(x, y); ctx.lineTo(x + cw, y); }
             if (r === size - 1 || !check(p.curr + size)) { ctx.moveTo(x, y + ch); ctx.lineTo(x + cw, y + ch); }
             if (c === 0 || !check(p.curr - 1)) { ctx.moveTo(x, y); ctx.lineTo(x, y + ch); }
             if (c === size - 1 || !check(p.curr + 1)) { ctx.moveTo(x + cw, y); ctx.lineTo(x + cw, y + ch); }
             ctx.stroke(); ctx.restore();
         } else {
-            ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1; ctx.strokeRect(x, y, cw, ch);
+            // 黄色组合或普通白色
+            ctx.strokeStyle = (p.groupId !== -1) ? "yellow" : "rgba(255,255,255,0.4)";
+            ctx.lineWidth = (p.groupId !== -1) ? 2 : 1;
+            ctx.strokeRect(x, y, cw, ch);
         }
     }
 
     function drawFrag(p, x, y, cw, ch) {
-        const sw = img.width / size, sh = img.height / size;
+        if (!currentImg) return;
+        const sw = currentImg.width / size, sh = currentImg.height / size;
         const sx = (p.orig % size) * sw, sy = Math.floor(p.orig / size) * sh;
-        ctx.drawImage(img, sx, sy, sw, sh, x, y, cw, ch);
+        ctx.drawImage(currentImg, sx, sy, sw, sh, x, y, cw, ch);
     }
 
     function spawnConfetti() {
@@ -383,7 +532,7 @@
     }
 
     function toggleModal(v) { document.getElementById('modal').style.display = v ? 'flex' : 'none'; }
-    window.addEventListener('resize', () => { if(img.src) syncSize(); });
+    window.addEventListener('resize', () => { if(currentImg) syncSize(); });
 </script>
 </body>
 </html>
