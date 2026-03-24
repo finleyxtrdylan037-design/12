@@ -3,543 +3,550 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>拼图小游戏 v2.6 - 旗舰版</title>
+    <title>拼图小游戏 v2.6 - 交互全优化版</title>
     <style>
-        :root {
-            --bg-color: #1a1a1a;
-            --panel-bg: #2d2d2d;
-            --text-color: #e0e0e0;
-            --accent-color: #4caf50;
-            --header-h: 50px;
-            --footer-h: 80px;
+        :root { --primary: #2c3e50; --success: #27ae60; --warning: #f1c40f; --bg: #f4f7f6; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; }
+        body { 
+            margin: 0; padding: 0; font-family: -apple-system, system-ui; 
+            background: var(--bg); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; 
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            height: 100dvh;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            touch-action: none;
+        /* 顶部 UI 三行强制约束 */
+        .ui-container { padding: 10px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
+        .ui-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 36px; }
+        .ui-row:last-child { margin-bottom: 0; }
+        
+        .title { font-weight: bold; color: var(--primary); font-size: 14px; }
+        .level-indicator { font-size: 16px; font-weight: 800; color: #34495e; }
+        
+        button { 
+            padding: 6px 12px; border: none; border-radius: 6px; background: var(--primary); 
+            color: white; font-size: 13px; cursor: pointer; transition: opacity 0.2s;
         }
+        button:active { opacity: 0.7; }
+        button.hidden { display: none !important; }
+        button#next-btn { background: var(--success); font-weight: bold; }
+        
+        select { padding: 5px; border-radius: 4px; border: 1px solid #ddd; outline: none; }
 
-        /* 布局约束 */
-        header, .controls, footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 15px;
-            z-index: 10;
+        /* 画布区域 */
+        #game-wrapper { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; padding: 10px; }
+        canvas { max-width: 100%; max-height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.15); background: #eee; border-radius: 4px; }
+        
+        #msg-overlay { 
+            position: absolute; bottom: 20px; width: 100%; text-align: center; 
+            font-size: 32px; font-weight: bold; color: var(--success); 
+            pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,0.1); opacity: 0; transition: opacity 0.3s;
         }
-
-        header { height: var(--header-h); background: var(--panel-bg); border-bottom: 1px solid #444; }
-        .controls { height: 50px; background: rgba(45,45,45,0.8); gap: 10px; }
-        footer { height: var(--footer-h); justify-content: center; }
-
-        .title { font-weight: bold; font-size: 14px; }
-        .level-info { font-family: monospace; color: var(--accent-color); }
-
-        button {
-            background: #444;
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        button:active { transform: scale(0.95); background: #555; }
-        button.primary { background: var(--accent-color); font-weight: bold; }
-        button.hidden { display: none; }
-
-        select {
-            background: #444;
-            color: white;
-            border: 1px solid #555;
-            padding: 4px;
-            border-radius: 4px;
-        }
-
-        #game-container {
-            flex: 1;
-            position: relative;
-            width: 100%;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        canvas {
-            display: block;
-            touch-action: none;
-            cursor: grab;
-        }
-        canvas:active { cursor: grabbing; }
-
-        #success-msg {
-            font-size: 24px;
-            font-weight: 900;
-            color: #4caf50;
-            text-shadow: 0 0 10px rgba(76,175,80,0.5);
-            opacity: 0;
-            transform: scale(0.8);
-            transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        #success-msg.show { opacity: 1; transform: scale(1.1); }
-
-        /* 预加载遮罩 */
-        #loader {
-            position: fixed;
-            inset: 0;
-            background: var(--bg-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            transition: 0.5s;
-        }
-        #loader.fade { opacity: 0; pointer-events: none; }
-        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<header>
-    <div class="title">拼图 v2.6</div>
-    <div class="level-info" id="level-display">加载中...</div>
-    <button onclick="changeLevel(0)">选择图片</button>
-</header>
-
-<div class="controls">
-    <button id="prev-btn" class="hidden" onclick="changeLevel(-1)">上一关</button>
-    <button id="hint-btn" class="hidden" onmousedown="toggleHint(true)" onmouseup="toggleHint(false)" ontouchstart="toggleHint(true)" ontouchend="toggleHint(false)">显示原图</button>
-    <div style="flex:1"></div>
-    <button id="next-btn" class="primary" onclick="changeLevel(1)">下一关</button>
+<div class="ui-container">
+    <div class="ui-row">
+        <div class="title">拼图 v2.6</div>
+        <div class="level-indicator" id="level-txt">第 1/50 关</div>
+        <button onclick="document.getElementById('file-input').click()">选择图片</button>
+        <input type="file" id="file-input" hidden accept="image/*">
+    </div>
+    <div class="ui-row">
+        <button id="prev-btn" class="hidden" onclick="changeLevel(-1)">上一关</button>
+        <button id="show-origin" class="hidden" ontouchstart="toggleOrigin(true)" ontouchend="toggleOrigin(false)" onmousedown="toggleOrigin(true)" onmouseup="toggleOrigin(false)">显示原图</button>
+        <button id="next-btn" onclick="changeLevel(1)">下一关</button>
+    </div>
+    <div class="ui-row">
+        <select id="diff-select" onchange="initGame()">
+            <option value="3">3 x 3</option>
+            <option value="5" selected>5 x 5</option>
+            <option value="8">8 x 8</option>
+        </select>
+        <button onclick="initGame()" style="background:#7f8c8d">重新开始</button>
+    </div>
 </div>
 
-<div id="game-container">
+<div id="game-wrapper">
     <canvas id="gameCanvas"></canvas>
-</div>
-
-<div class="controls" style="border-top: 1px solid #333;">
-    <select id="diff-select" onchange="resetGame()">
-        <option value="3">难度: 3x3</option>
-        <option value="5" selected>难度: 5x5</option>
-        <option value="8">难度: 8x8</option>
-    </select>
-    <button onclick="resetGame()">重新开始</button>
-</div>
-
-<footer>
-    <div id="success-msg">拼图成功</div>
-</footer>
-
-<div id="loader">
-    <div class="spinner"></div>
-    <p style="margin-top:15px; font-size:12px; color:#666;">初始化异步引擎...</p>
+    <div id="msg-overlay">拼图成功</div>
 </div>
 
 <script>
 /**
- * 拼图 v2.6 核心架构
- * 高级异步调度 + 并查集连通算法
+ * 拼图 v2.6 - 核心架构
  */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const msgOverlay = document.getElementById('msg-overlay');
+const dpr = window.devicePixelRatio || 1;
 
-const CONFIG = {
-    totalLevels: 50,
-    snapTolerance: 20, // 吸附阈值
-    ids: Array.from({length: 50}, (_, i) => 10 + i * 3), // 生成50个Picsum ID
-    isRetina: window.devicePixelRatio > 1
+// 配置与状态
+const state = {
+    level: 1,
+    maxLevel: 50,
+    grid: 5,
+    img: null,
+    pieces: [],
+    draggingPiece: null,
+    dragOffset: { x: 0, y: 0 },
+    isSuccess: false,
+    prevUnlocked: false,
+    preloads: new Map(),
+    targetPos: null, // 目标高亮框
+    showOriginal: false
 };
 
-class GameEngine {
-    constructor() {
-        this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.dpr = window.devicePixelRatio || 1;
-        
-        this.currentLevel = 1;
-        this.imgCache = new Map();
-        this.pieces = [];
-        this.activeGroup = null;
-        this.isWin = false;
-        this.showHint = false;
-        
-        this.img = null;
-        this.gridSize = 5;
-        this.rect = { w: 0, h: 0, scale: 1 };
-        
-        this.initEvents();
-    }
+// 1. 关卡图库（Picsum 随机池）
+const getImgUrl = (id) => `https://picsum.photos/id/${(id * 10) + 10}/800/1000`;
 
-    // 1. 核心修复：优先级调度加载
-    async loadLevel(level) {
-        document.getElementById('loader').classList.remove('fade');
-        const id = CONFIG.ids[level - 1];
-        const url = `https://picsum.photos/id/${id}/800/1000`;
-
-        try {
-            // Priority 0: 必须加载当前图
-            let img;
-            if (this.imgCache.has(level)) {
-                img = this.imgCache.get(level);
-            } else {
-                img = await this.loadImage(url);
-                this.imgCache.set(level, img);
-            }
-            
-            this.img = img;
-            this.currentLevel = level;
-            this.updateUI();
-            this.resetGame();
-            
-            document.getElementById('loader').classList.add('fade');
-
-            // Priority 1: 延迟 500ms 后静默串行预加载后续
-            setTimeout(() => this.preloadNext(level + 1), 500);
-            
-        } catch (e) {
-            console.error("加载失败，跳转下一关");
-            this.changeLevel(1);
-        }
-    }
-
-    loadImage(url) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = url;
-        });
-    }
-
-    async preloadNext(level) {
-        if (level > CONFIG.totalLevels || this.imgCache.has(level)) return;
-        const id = CONFIG.ids[level - 1];
-        try {
-            const img = await this.loadImage(`https://picsum.photos/id/${id}/800/1000`);
-            this.imgCache.set(level, img);
-            console.log(`静默预加载完成: Level ${level}`);
-            // 递归串行加载
-            this.preloadNext(level + 1);
-        } catch(e) {}
-    }
-
-    // 2. 响应式布局计算
-    resize() {
-        const container = document.getElementById('game-container');
-        const cw = container.clientWidth - 40;
-        const ch = container.clientHeight - 40;
-        
-        const imgRatio = this.img.width / this.img.height;
-        const contRatio = cw / ch;
-
-        if (imgRatio > contRatio) {
-            this.rect.w = cw;
-            this.rect.h = cw / imgRatio;
-        } else {
-            this.rect.h = ch;
-            this.rect.w = ch * imgRatio;
-        }
-
-        this.canvas.width = this.rect.w * this.dpr;
-        this.canvas.height = this.rect.h * this.dpr;
-        this.canvas.style.width = `${this.rect.w}px`;
-        this.canvas.style.height = `${this.rect.h}px`;
-        this.ctx.scale(this.dpr, this.dpr);
-    }
-
-    // 3. 核心算法：全能 N 片组合 (Union-Find 思想简化版)
-    resetGame() {
-        this.gridSize = parseInt(document.getElementById('diff-select').value);
-        this.isWin = false;
-        document.getElementById('success-msg').classList.remove('show');
-        this.resize();
-
-        const pw = this.rect.w / this.gridSize;
-        const ph = this.rect.h / this.gridSize;
-        this.pieces = [];
-
-        for (let r = 0; r < this.gridSize; r++) {
-            for (let c = 0; c < this.gridSize; c++) {
-                this.pieces.push({
-                    id: r * this.gridSize + c,
-                    r, c,
-                    currX: Math.random() * (this.rect.w - pw),
-                    currY: Math.random() * (this.rect.h - ph),
-                    targetX: c * pw,
-                    targetY: r * ph,
-                    w: pw,
-                    h: ph,
-                    isLocked: false,
-                    groupId: -1 // -1 表示独立
-                });
-            }
-        }
-        this.render();
-    }
-
-    // 更新连通分支
-    checkConnections() {
-        let changed = true;
-        while (changed) {
-            changed = false;
-            for (let i = 0; i < this.pieces.length; i++) {
-                for (let j = 0; j < this.pieces.length; j++) {
-                    if (i === j) continue;
-                    const p1 = this.pieces[i];
-                    const p2 = this.pieces[j];
-                    
-                    // 仅检测未锁定的或同一个组的
-                    if (p1.isLocked || p2.isLocked) continue;
-
-                    // 计算相对位置是否正确
-                    const idealDX = (p2.c - p1.c) * p1.w;
-                    const idealDY = (p2.r - p1.r) * p1.h;
-                    const currDX = p2.currX - p1.currX;
-                    const currDY = p2.currY - p1.currY;
-
-                    const error = Math.sqrt((idealDX - currDX)**2 + (idealDY - currDY)**2);
-
-                    if (error < CONFIG.snapTolerance) {
-                        // 判定为应连接
-                        if (this.mergeGroups(p1, p2)) {
-                            // 修正位置
-                            p2.currX = p1.currX + idealDX;
-                            p2.currY = p1.currY + idealDY;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 检查是否整体归位
-        this.pieces.forEach(p => {
-            const distToTarget = Math.sqrt((p.currX - p.targetX)**2 + (p.currY - p.targetY)**2);
-            if (distToTarget < CONFIG.snapTolerance) {
-                p.currX = p.targetX;
-                p.currY = p.targetY;
-                p.isLocked = true;
-            }
-        });
-
-        if (this.pieces.every(p => p.isLocked)) this.handleWin();
-    }
-
-    mergeGroups(p1, p2) {
-        if (p1.groupId !== -1 && p1.groupId === p2.groupId) return false;
-        
-        const newId = p1.groupId !== -1 ? p1.groupId : (p2.groupId !== -1 ? p2.groupId : p1.id);
-        const oldId2 = p2.groupId;
-        const oldId1 = p1.groupId;
-
-        p1.groupId = newId;
-        p2.groupId = newId;
-        
-        // 扩散到整个旧组
-        if (oldId2 !== -1 || oldId1 !== -1) {
-            this.pieces.forEach(p => {
-                if (p.groupId === oldId2 && oldId2 !== -1) p.groupId = newId;
-                if (p.groupId === oldId1 && oldId1 !== -1) p.groupId = newId;
-            });
-        }
-        return true;
-    }
-
-    // 4. 高清渲染与智能边框
-    render() {
-        this.ctx.clearRect(0, 0, this.rect.w, this.rect.h);
-        
-        if (this.showHint) {
-            this.ctx.globalAlpha = 0.3;
-            this.ctx.drawImage(this.img, 0, 0, this.rect.w, this.rect.h);
-            this.ctx.globalAlpha = 1.0;
-        }
-
-        // 绘制顺序：锁定碎片 -> 普通碎片 -> 激活组（置顶）
-        const sorted = [...this.pieces].sort((a, b) => {
-            if (a.isLocked !== b.isLocked) return a.isLocked ? -1 : 1;
-            if (this.activeGroup && (a.groupId === this.activeGroup || a.id === this.activeGroup)) return 1;
-            return 0;
-        });
-
-        sorted.forEach(p => {
-            this.ctx.save();
-            
-            // 裁剪区域
-            this.ctx.beginPath();
-            this.ctx.rect(p.currX, p.currY, p.w, p.h);
-            this.ctx.clip();
-
-            // 绘制图像
-            const sx = (p.c * this.img.width) / this.gridSize;
-            const sy = (p.r * this.img.height) / this.gridSize;
-            const sw = this.img.width / this.gridSize;
-            const sh = this.img.height / this.gridSize;
-            this.ctx.drawImage(this.img, sx, sy, sw, sh, p.currX, p.currY, p.w, p.h);
-
-            this.ctx.restore();
-
-            // 智能边框渲染
-            this.ctx.beginPath();
-            this.ctx.rect(p.currX, p.currY, p.w, p.h);
-            if (p.isLocked) {
-                this.ctx.strokeStyle = '#4caf50';
-                this.ctx.lineWidth = 0.5; // 锁定后变细
-            } else if (p.groupId !== -1) {
-                this.ctx.strokeStyle = '#ffeb3b';
-                this.ctx.lineWidth = 2;
-            } else {
-                this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-                this.ctx.lineWidth = 1;
-            }
-            this.ctx.stroke();
-        });
-    }
-
-    // 5. 交互引擎（修复点击不响应问题）
-    initEvents() {
-        const handleStart = (e) => {
-            if (this.isWin) return;
-            e.preventDefault();
-            const pos = this.getPos(e);
-            
-            // 倒序寻找点击的碎片（从顶层开始）
-            for (let i = this.pieces.length - 1; i >= 0; i--) {
-                const p = this.pieces[i];
-                if (!p.isLocked && pos.x >= p.currX && pos.x <= p.currX + p.w && pos.y >= p.currY && pos.y <= p.currY + p.h) {
-                    this.dragTarget = p;
-                    this.activeGroup = p.groupId !== -1 ? p.groupId : p.id;
-                    this.lastPos = pos;
-                    
-                    // 记录组内所有片相对于点击点的偏移
-                    this.groupMembers = this.pieces.filter(item => 
-                        (p.groupId !== -1 && item.groupId === p.groupId) || (item.id === p.id)
-                    );
-                    break;
-                }
-            }
+// 2. 初始化预加载系统 (Priority 0 & 1)
+async function loadImage(url) {
+    if (state.preloads.has(url)) return state.preloads.get(url);
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = url;
+        img.onload = () => {
+            state.preloads.set(url, img);
+            resolve(img);
         };
+    });
+}
 
-        const handleMove = (e) => {
-            if (!this.dragTarget) return;
-            const pos = this.getPos(e);
-            const dx = pos.x - this.lastPos.x;
-            const dy = pos.y - this.lastPos.y;
-
-            // 整体移动
-            this.groupMembers.forEach(p => {
-                p.currX += dx;
-                p.currY += dy;
-            });
-
-            // 边界检查（Auto-Clamping）
-            this.clampGroup();
-
-            this.lastPos = pos;
-            this.render();
-        };
-
-        const handleEnd = () => {
-            if (!this.dragTarget) return;
-            this.checkConnections();
-            this.dragTarget = null;
-            this.activeGroup = null;
-            this.render();
-        };
-
-        this.canvas.addEventListener('mousedown', handleStart);
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
-
-        this.canvas.addEventListener('touchstart', handleStart, { passive: false });
-        window.addEventListener('touchmove', handleMove, { passive: false });
-        window.addEventListener('touchend', handleEnd);
+// 串行预加载：当前关卡加载后，每隔500ms加载后面两关
+async function startBackgroundPreload() {
+    for (let i = 1; i <= 2; i++) {
+        const nextLv = state.level + i;
+        if (nextLv <= state.maxLevel) {
+            setTimeout(() => loadImage(getImgUrl(nextLv)), 500 * i);
+        }
     }
+}
 
-    getPos(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
-        };
-    }
-
-    clampGroup() {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        this.groupMembers.forEach(p => {
-            minX = Math.min(minX, p.currX);
-            minY = Math.min(minY, p.currY);
-            maxX = Math.max(maxX, p.currX + p.w);
-            maxY = Math.max(maxY, p.currY + p.h);
-        });
-
-        let offX = 0, offY = 0;
-        if (minX < 0) offX = -minX;
-        if (maxX > this.rect.w) offX = this.rect.w - maxX;
-        if (minY < 0) offY = -minY;
-        if (maxY > this.rect.h) offY = this.rect.h - maxY;
-
-        this.groupMembers.forEach(p => {
-            p.currX += offX;
-            p.currY += offY;
-        });
-    }
-
-    handleWin() {
-        this.isWin = true;
-        document.getElementById('success-msg').classList.add('show');
+// 3. 核心游戏逻辑
+async function initGame(customImg = null) {
+    state.isSuccess = false;
+    msgOverlay.style.opacity = 0;
+    state.grid = parseInt(document.getElementById('diff-select').value);
+    
+    // UI 更新
+    document.getElementById('level-txt').innerText = `第 ${state.level}/50 关`;
+    if (state.level > 1 || state.prevUnlocked) {
         document.getElementById('prev-btn').classList.remove('hidden');
+        state.prevUnlocked = true;
+    }
+
+    // 资源加载
+    if (customImg) {
+        state.img = customImg;
+    } else {
+        state.img = await loadImage(getImgUrl(state.level));
+    }
+    document.getElementById('show-origin').classList.remove('hidden');
+
+    setupCanvas();
+    createPieces();
+    shufflePieces();
+    render();
+    startBackgroundPreload();
+}
+
+function setupCanvas() {
+    const wrapper = document.getElementById('game-wrapper');
+    const padding = 20;
+    const availableW = wrapper.clientWidth - padding;
+    const availableH = wrapper.clientHeight - padding - 80; // 为底部文字留空
+
+    const imgRatio = state.img.width / state.img.height;
+    const containerRatio = availableW / availableH;
+
+    if (imgRatio > containerRatio) {
+        canvas.width = availableW;
+        canvas.height = availableW / imgRatio;
+    } else {
+        canvas.height = availableH;
+        canvas.width = availableH * imgRatio;
+    }
+
+    // Retina 适配
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
+    canvas.width *= dpr;
+    canvas.height *= dpr;
+    ctx.scale(dpr, dpr);
+}
+
+function createPieces() {
+    state.pieces = [];
+    const pw = (canvas.width / dpr) / state.grid;
+    const ph = (canvas.height / dpr) / state.grid;
+
+    for (let r = 0; r < state.grid; r++) {
+        for (let c = 0; c < state.grid; c++) {
+            state.pieces.push({
+                id: r * state.grid + c,
+                correctR: r,
+                correctC: c,
+                currentR: r,
+                currentC: c,
+                x: c * pw,
+                y: r * ph,
+                isLocked: false,
+                groupId: null
+            });
+        }
+    }
+}
+
+function shufflePieces() {
+    // 随机打乱除了已锁定的位置
+    const positions = state.pieces.map(p => ({ r: p.currentR, c: p.currentC }));
+    for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    state.pieces.forEach((p, i) => {
+        p.currentR = positions[i].r;
+        p.currentC = positions[i].c;
+        const pw = (canvas.width / dpr) / state.grid;
+        const ph = (canvas.height / dpr) / state.grid;
+        p.x = p.currentC * pw;
+        p.y = p.currentR * ph;
+        checkLock(p);
+    });
+    updateGroups();
+}
+
+// 4. 碎片组合逻辑 (Group Move)
+function updateGroups() {
+    // 重置所有 groupId
+    state.pieces.forEach(p => { if(!p.isLocked) p.groupId = null; });
+    let groupIdCounter = 0;
+
+    for (let p of state.pieces) {
+        if (p.isLocked) continue;
+        // 查找邻居（上下左右）
+        state.pieces.forEach(other => {
+            if (other === p || other.isLocked) return;
+            
+            // 判定：如果 other 在 p 的逻辑正确位置相邻，且当前也相邻
+            const isLogicalNeighbor = 
+                (Math.abs(p.correctR - other.correctR) === 1 && p.correctC === other.correctC) ||
+                (Math.abs(p.correctC - other.correctC) === 1 && p.correctR === other.correctR);
+            
+            const isPhysicalNeighbor = 
+                (Math.abs(p.currentR - other.currentR) === 1 && p.currentC === other.currentC) ||
+                (Math.abs(p.currentC - other.currentC) === 1 && p.currentR === other.currentR);
+
+            if (isLogicalNeighbor && isPhysicalNeighbor) {
+                if (p.groupId && other.groupId) {
+                    const oldId = other.groupId;
+                    state.pieces.forEach(x => { if(x.groupId === oldId) x.groupId = p.groupId; });
+                } else if (p.groupId) {
+                    other.groupId = p.groupId;
+                } else if (other.groupId) {
+                    p.groupId = other.groupId;
+                } else {
+                    const newId = ++groupIdCounter;
+                    p.groupId = newId;
+                    other.groupId = newId;
+                }
+            }
+        });
+    }
+}
+
+// 5. 渲染引擎
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const pw = (canvas.width / dpr) / state.grid;
+    const ph = (canvas.height / dpr) / state.grid;
+
+    if (state.showOriginal) {
+        ctx.globalAlpha = 0.8;
+        ctx.drawImage(state.img, 0, 0, canvas.width/dpr, canvas.height/dpr);
+        ctx.globalAlpha = 1.0;
+        return;
+    }
+
+    // 目标高亮
+    if (state.targetPos) {
+        ctx.fillStyle = 'rgba(52, 152, 219, 0.4)';
+        ctx.fillRect(state.targetPos.c * pw, state.targetPos.r * ph, pw, ph);
+    }
+
+    // 绘制碎片
+    const sortedPieces = [...state.pieces].sort((a, b) => {
+        if (a === state.draggingPiece || (a.groupId && a.groupId === state.draggingPiece?.groupId)) return 1;
+        return 0;
+    });
+
+    sortedPieces.forEach(p => {
+        ctx.save();
+        if (p === state.draggingPiece || (p.groupId && p.groupId === state.draggingPiece?.groupId)) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+        }
+
+        // 剪切并绘制图片
+        ctx.beginPath();
+        ctx.rect(p.x, p.y, pw, ph);
+        ctx.clip();
         
-        // 3秒后自动下一关
-        setTimeout(() => {
-            if (this.isWin) this.changeLevel(1);
-        }, 3000);
-    }
+        const sw = state.img.width / state.grid;
+        const sh = state.img.height / state.grid;
+        ctx.drawImage(state.img, p.correctC * sw, p.correctR * sh, sw, sh, p.x, p.y, pw, ph);
+        
+        // 智能边框合并逻辑
+        ctx.restore();
+        drawSmartBorder(p, pw, ph);
+    });
 
-    updateUI() {
-        document.getElementById('level-display').innerText = `第 ${this.currentLevel}/${CONFIG.totalLevels} 关`;
-        document.getElementById('hint-btn').classList.remove('hidden');
-    }
-
-    changeLevel(delta) {
-        let next = this.currentLevel + delta;
-        if (delta === 0) next = Math.floor(Math.random() * CONFIG.totalLevels) + 1;
-        if (next < 1) next = CONFIG.totalLevels;
-        if (next > CONFIG.totalLevels) next = 1;
-        this.loadLevel(next);
+    if (state.isSuccess) {
+        msgOverlay.style.opacity = 1;
     }
 }
 
-// 全局实例
-const game = new GameEngine();
-window.onload = () => game.loadLevel(1);
+function drawSmartBorder(p, pw, ph) {
+    let color = '#fff'; // 默认白色
+    let lineWidth = 1;
 
-// 桥接 UI 函数
-function resetGame() { game.resetGame(); }
-function changeLevel(d) { game.changeLevel(d); }
-function toggleHint(show) { 
-    game.showHint = show;
-    game.render();
+    if (p.isLocked) {
+        color = '#27ae60';
+        lineWidth = 3;
+    } else if (p.groupId) {
+        color = '#f1c40f';
+        lineWidth = 2;
+    }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+
+    // 检查四个方向是否有同状态邻居，实现边框合并
+    const hasMatch = (dr, dc) => {
+        const n = state.pieces.find(x => x.currentR === p.currentR + dr && x.currentC === p.currentC + dc);
+        if (!n) return false;
+        if (p.isLocked) return n.isLocked;
+        if (p.groupId) return n.groupId === p.groupId;
+        return false;
+    };
+
+    ctx.beginPath();
+    if (!hasMatch(-1, 0)) { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + pw, p.y); } // Top
+    if (!hasMatch(1, 0)) { ctx.moveTo(p.x, p.y + ph); ctx.lineTo(p.x + pw, p.y + ph); } // Bottom
+    if (!hasMatch(0, -1)) { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y + ph); } // Left
+    if (!hasMatch(0, 1)) { ctx.moveTo(p.x + pw, p.y); ctx.lineTo(p.x + pw, p.y + ph); } // Right
+    ctx.stroke();
 }
 
-// 禁止 iOS 橡皮筋
-document.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 1) e.preventDefault();
-}, { passive: false });
+// 6. 交互处理
+function handleStart(e) {
+    if (state.isSuccess) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    const mouseX = touch.clientX - rect.left;
+    const mouseY = touch.clientY - rect.top;
+
+    const piece = state.pieces.find(p => 
+        !p.isLocked && mouseX >= p.x && mouseX <= p.x + (canvas.width/dpr/state.grid) &&
+        mouseY >= p.y && mouseY <= p.y + (canvas.height/dpr/state.grid)
+    );
+
+    if (piece) {
+        state.draggingPiece = piece;
+        state.dragOffset = { x: mouseX - piece.x, y: mouseY - piece.y };
+        // 记录组内所有碎片的相对偏移
+        if (piece.groupId) {
+            state.pieces.filter(p => p.groupId === piece.groupId).forEach(p => {
+                p.relX = p.x - piece.x;
+                p.relY = p.y - piece.y;
+            });
+        }
+    }
+}
+
+function handleMove(e) {
+    if (!state.draggingPiece) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    const mouseX = touch.clientX - rect.left;
+    const mouseY = touch.clientY - rect.top;
+
+    const pw = (canvas.width / dpr) / state.grid;
+    const ph = (canvas.height / dpr) / state.grid;
+
+    // 移动当前碎片或整个组
+    const newX = mouseX - state.dragOffset.x;
+    const newY = mouseY - state.dragOffset.y;
+
+    if (state.draggingPiece.groupId) {
+        const group = state.pieces.filter(p => p.groupId === state.draggingPiece.groupId);
+        // 计算组边界
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        group.forEach(p => {
+            const tx = newX + p.relX;
+            const ty = newY + p.relY;
+            minX = Math.min(minX, tx); minY = Math.min(minY, ty);
+            maxX = Math.max(maxX, tx + pw); maxY = Math.max(maxY, ty + ph);
+        });
+
+        // 碰撞挤回逻辑
+        let offsetX = 0, offsetY = 0;
+        if (minX < 0) offsetX = -minX;
+        if (maxX > canvas.width/dpr) offsetX = canvas.width/dpr - maxX;
+        if (minY < 0) offsetY = -minY;
+        if (maxY > canvas.height/dpr) offsetY = canvas.height/dpr - maxY;
+
+        group.forEach(p => {
+            p.x = newX + p.relX + offsetX;
+            p.y = newY + p.relY + offsetY;
+        });
+    } else {
+        state.draggingPiece.x = Math.max(0, Math.min(newX, canvas.width/dpr - pw));
+        state.draggingPiece.y = Math.max(0, Math.min(newY, canvas.height/dpr - ph));
+    }
+
+    // 目标网格反馈
+    state.targetPos = {
+        r: Math.round(state.draggingPiece.y / ph),
+        c: Math.round(state.draggingPiece.x / pw)
+    };
+    render();
+}
+
+function handleEnd() {
+    if (!state.draggingPiece) return;
+    
+    const pw = (canvas.width / dpr) / state.grid;
+    const ph = (canvas.height / dpr) / state.grid;
+    const targetR = state.targetPos.r;
+    const targetC = state.targetPos.c;
+
+    // 执行交换
+    if (state.draggingPiece.groupId) {
+        const group = state.pieces.filter(p => p.groupId === state.draggingPiece.groupId);
+        const dr = targetR - state.draggingPiece.currentR;
+        const dc = targetC - state.draggingPiece.currentC;
+        
+        // 检查组内所有位置是否合法且未锁定
+        let canSwap = true;
+        group.forEach(p => {
+            const tr = p.currentR + dr, tc = p.currentC + dc;
+            const occupant = state.pieces.find(x => x.currentR === tr && x.currentC === tc);
+            if (tr < 0 || tr >= state.grid || tc < 0 || tc >= state.grid || (occupant && occupant.isLocked)) {
+                canSwap = false;
+            }
+        });
+
+        if (canSwap) {
+            group.forEach(p => {
+                const tr = p.currentR + dr, tc = p.currentC + dc;
+                const occupant = state.pieces.find(x => x.currentR === tr && x.currentC === tc && x.groupId !== p.groupId);
+                if (occupant) {
+                    occupant.currentR = p.currentR; occupant.currentC = p.currentC;
+                    occupant.x = occupant.currentC * pw; occupant.y = occupant.currentR * ph;
+                }
+                p.currentR = tr; p.currentC = tc;
+            });
+        }
+    } else {
+        const occupant = state.pieces.find(p => p.currentR === targetR && p.currentC === targetC);
+        if (occupant && !occupant.isLocked) {
+            occupant.currentR = state.draggingPiece.currentR;
+            occupant.currentC = state.draggingPiece.currentC;
+            occupant.x = occupant.currentC * pw;
+            occupant.y = occupant.currentR * ph;
+            state.draggingPiece.currentR = targetR;
+            state.draggingPiece.currentC = targetC;
+        }
+    }
+
+    // 归位并重绘
+    state.pieces.forEach(p => {
+        p.x = p.currentC * pw;
+        p.y = p.currentR * ph;
+        checkLock(p);
+    });
+
+    state.draggingPiece = null;
+    state.targetPos = null;
+    updateGroups();
+    render();
+    checkWin();
+}
+
+function checkLock(p) {
+    if (p.currentR === p.correctR && p.currentC === p.correctC) {
+        p.isLocked = true;
+        p.groupId = null;
+    }
+}
+
+function checkWin() {
+    if (state.pieces.every(p => p.isLocked)) {
+        state.isSuccess = true;
+        render();
+        confettiEffect();
+        setTimeout(() => changeLevel(1), 3000);
+    }
+}
+
+// 7. 辅助功能
+function changeLevel(delta) {
+    state.level = Math.max(1, Math.min(state.maxLevel, state.level + delta));
+    initGame();
+}
+
+function toggleOrigin(show) {
+    state.showOriginal = show;
+    render();
+}
+
+function confettiEffect() {
+    // 简单的 Canvas 粒子特效 (简版)
+    let particles = [];
+    for(let i=0; i<100; i++) {
+        particles.push({
+            x: canvas.width/dpr/2, y: canvas.height/dpr/2,
+            vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10,
+            c: `hsl(${Math.random()*360}, 70%, 50%)`
+        });
+    }
+    const run = () => {
+        if (!state.isSuccess) return;
+        ctx.save();
+        particles.forEach(p => {
+            p.x += p.vx; p.y += p.vy; p.vy += 0.1;
+            ctx.fillStyle = p.c;
+            ctx.fillRect(p.x, p.y, 4, 4);
+        });
+        ctx.restore();
+        requestAnimationFrame(run);
+    };
+    run();
+}
+
+// 8. 事件监听
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+window.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+window.addEventListener('touchend', handleEnd);
+
+document.getElementById('file-input').onchange = (e) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => initGame(img);
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(e.target.files[0]);
+};
+
+// 启动
+window.onload = () => initGame();
+
 </script>
-
 </body>
 </html>
