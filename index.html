@@ -4,629 +4,921 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>拼图 v2.7</title>
+<title>拼图 v2.8</title>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
---bg:#0f1117;--surface:#1a1d27;--border:#2a2d3a;--text:#e8e6e3;--text2:#9a97a0;
---accent:#4fc3f7;--green:#43a047;--yellow:#fdd835;--red:#ef5350;
---radius:8px;--shadow:0 2px 12px rgba(0,0,0,.4);
+  --bg:#0f1117;--card:#1a1c25;--border:#2a2d3a;
+  --accent:#3b82f6;--accent2:#2563eb;--green:#22c55e;--green-dim:#166534;
+  --yellow:#eab308;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --danger:#ef4444;--shadow:0 4px 24px rgba(0,0,0,.4);
+  --font:'Noto Sans SC','PingFang SC','Helvetica Neue',sans-serif;
 }
-html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);color:var(--text);font-family:'SF Pro Display','PingFang SC','Noto Sans SC','Helvetica Neue',sans-serif;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
-#app{display:flex;flex-direction:column;height:100dvh;width:100%;max-width:520px;margin:0 auto;padding:4px 6px 0}
-.row{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:2px 0;flex-shrink:0}
-.row.r2{justify-content:center;gap:8px}
-.row.r3{gap:6px;justify-content:center}
-.title{font-size:14px;font-weight:700;letter-spacing:1px;color:var(--accent);white-space:nowrap}
-.level-label{font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap}
-.btn{padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;outline:none;-webkit-appearance:none}
-.btn:active{transform:scale(.95);background:#252836}
-.btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
-.btn.primary:active{background:#29b6f6}
-.btn.hide{display:none}
-select.diff{padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:12px;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;min-width:70px;text-align:center}
-#canvasWrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;min-height:0}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700;900&display=swap');
+html,body{
+  width:100%;height:100dvh;overflow:hidden;
+  background:var(--bg);color:var(--text);font-family:var(--font);
+  touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;
+  position:fixed;top:0;left:0;
+}
+#app{display:flex;flex-direction:column;height:100dvh;width:100%;overflow:hidden}
+
+/* Header */
+.header{flex-shrink:0;padding:6px 10px 4px;background:var(–card);border-bottom:1px solid var(–border)}
+.row{display:flex;align-items:center;justify-content:center;gap:6px;padding:2px 0;flex-wrap:nowrap}
+.row1{justify-content:space-between}
+.logo{font-size:15px;font-weight:900;background:linear-gradient(135deg,var(–accent),#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+.level-display{font-size:14px;font-weight:700;color:var(–text)}
+.btn{
+padding:5px 12px;border-radius:8px;border:none;font-size:12px;font-weight:700;
+cursor:pointer;font-family:var(–font);transition:all .15s;white-space:nowrap;
+flex-shrink:0;
+}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-primary{background:var(–accent);color:#fff}
+.btn-primary:active{background:var(–accent2);transform:scale(.95)}
+.btn-green{background:var(–green);color:#fff}
+.btn-green:active{background:#16a34a;transform:scale(.95)}
+.btn-outline{background:transparent;color:var(–text2);border:1px solid var(–border)}
+.btn-outline:active{background:var(–border)}
+.btn-danger{background:var(–danger);color:#fff}
+.btn-danger:active{background:#dc2626;transform:scale(.95)}
+.btn-hidden{display:none!important}
+select{
+padding:4px 8px;border-radius:8px;border:1px solid var(–border);
+background:var(–card);color:var(–text);font-size:12px;font-family:var(–font);
+cursor:pointer;font-weight:600;
+}
+
+/* Canvas area */
+.canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;min-height:0}
 canvas{display:block;touch-action:none}
-#successMsg{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:22px;font-weight:800;color:var(--green);text-shadow:0 1px 6px rgba(67,160,71,.4);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
-#successMsg.show{opacity:1}
-#overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);display:none;z-index:100;align-items:center;justify-content:center}
-#overlay.show{display:flex}
-#overlay img{max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 4px 30px rgba(0,0,0,.6)}
-#overlayClose{position:absolute;top:max(env(safe-area-inset-top),12px);right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text2);font-size:14px;display:none}
-#loading.show{display:block}
-.confetti-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:200}
-@media(max-width:360px){.btn{padding:4px 7px;font-size:11px}.title{font-size:12px}}
+
+/* Success overlay */
+.success-text{
+position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+font-size:28px;font-weight:900;color:var(–green);
+text-shadow:0 2px 12px rgba(34,197,94,.5);
+opacity:0;pointer-events:none;transition:opacity .3s;
+white-space:nowrap;
+}
+.success-text.show{opacity:1}
+
+/* Confetti canvas */
+#confetti{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+
+/* Original image overlay */
+.overlay{
+position:fixed;top:0;left:0;width:100%;height:100%;
+background:rgba(0,0,0,.85);z-index:100;
+display:none;align-items:center;justify-content:center;
+flex-direction:column;
+}
+.overlay.show{display:flex}
+.overlay img{max-width:90vw;max-height:80vh;object-fit:contain;border-radius:12px;box-shadow:var(–shadow)}
+.overlay .close-btn{
+position:absolute;top:max(env(safe-area-inset-top),12px);right:12px;
+width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);
+border:none;color:#fff;font-size:20px;cursor:pointer;
+display:flex;align-items:center;justify-content:center;
+backdrop-filter:blur(8px);
+}
+
+/* Loading */
+.loading-indicator{
+position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+color:var(–text2);font-size:14px;font-weight:600;
+display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+.spinner{
+width:32px;height:32px;border:3px solid var(–border);border-top-color:var(–accent);
+border-radius:50%;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* File input */
+#fileInput{display:none}
+
+/* Responsive */
+@media(max-width:380px){
+.btn{padding:4px 8px;font-size:11px}
+.logo{font-size:13px}
+.level-display{font-size:12px}
+select{font-size:11px}
+}
 </style>
+
 </head>
 <body>
 <div id="app">
-  <div class="row r1">
-    <span class="title">拼图 v2.7</span>
-    <span class="level-label" id="levelLabel">第 1 关</span>
-    <button class="btn" id="btnUpload">选择图片</button>
+  <div class="header">
+    <div class="row row1">
+      <span class="logo">拼图 v2.8</span>
+      <span class="level-display" id="levelDisplay">第 1 关</span>
+      <button class="btn btn-sm btn-outline" id="btnChoose">选择图片</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-sm btn-outline btn-hidden" id="btnPrev">上一关</button>
+      <button class="btn btn-sm btn-primary btn-hidden" id="btnShowOrig">显示原图</button>
+      <button class="btn btn-sm btn-primary" id="btnNext">下一关</button>
+    </div>
+    <div class="row">
+      <select id="diffSelect">
+        <option value="3">3×3</option>
+        <option value="4" selected>4×4</option>
+        <option value="5">5×5</option>
+        <option value="6">6×6</option>
+        <option value="7">7×7</option>
+        <option value="8">8×8</option>
+      </select>
+      <button class="btn btn-sm btn-green" id="btnStart">开始游戏</button>
+    </div>
   </div>
-  <div class="row r2">
-    <button class="btn hide" id="btnPrev">上一关</button>
-    <button class="btn hide" id="btnShowImg">显示原图</button>
-    <button class="btn primary" id="btnNext">下一关</button>
-  </div>
-  <div class="row r3">
-    <select class="diff" id="diffSelect">
-      <option value="3">3×3</option>
-      <option value="4">4×4</option>
-      <option value="5" selected>5×5</option>
-      <option value="6">6×6</option>
-      <option value="7">7×7</option>
-      <option value="8">8×8</option>
-    </select>
-    <button class="btn primary" id="btnStart">开始</button>
-  </div>
-  <div id="canvasWrap">
+  <div class="canvas-wrap" id="canvasWrap">
     <canvas id="gameCanvas"></canvas>
-    <div id="successMsg">🎉 拼图成功！</div>
-    <div id="loading" class="show">加载中...</div>
+    <div class="success-text" id="successText">🎉 拼图成功！</div>
+    <canvas id="confetti"></canvas>
+    <div class="loading-indicator" id="loadingInd" style="display:none">
+      <div class="spinner"></div>
+      <span>加载图片中...</span>
+    </div>
   </div>
 </div>
-<div id="overlay"><img id="overlayImg" src=""><button id="overlayClose">✕</button></div>
-<input type="file" id="fileInput" accept="image/*" style="display:none">
-
+<div class="overlay" id="overlay">
+  <button class="close-btn" id="closeOverlay">✕</button>
+  <img id="overlayImg" src="">
+</div>
+<input type="file" id="fileInput" accept="image/*">
 <script>
 (()=>{
 'use strict';
 
-/* ============ CONSTANTS & STATE ============ */
-const VALID_IDS=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,96,97,98,99,100];
-const LEVELS=VALID_IDS.slice(0,50).map(id=>`https://picsum.photos/id/${id}/800/1000`);
+/* ─── Constants & State ─── */
+const VALID_IDS=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100];
+const IMAGE_URLS=VALID_IDS.slice(0,50).map(id=>`https://picsum.photos/id/${id}/800/1000`);
+const TOTAL_LEVELS=50;
 
 const $=id=>document.getElementById(id);
-const canvas=$('gameCanvas'),ctx=canvas.getContext('2d');
-const btnPrev=$('btnPrev'),btnNext=$('btnNext'),btnStart=$('btnStart'),btnUpload=$('btnUpload');
-const btnShowImg=$('btnShowImg'),diffSelect=$('diffSelect'),levelLabel=$('levelLabel');
-const overlayEl=$('overlay'),overlayImg=$('overlayImg'),overlayClose=$('overlayClose');
-const loadingEl=$('loading'),successMsg=$('successMsg'),fileInput=$('fileInput');
-const canvasWrap=$('canvasWrap');
+const canvas=$(‘gameCanvas’), ctx=canvas.getContext(‘2d’);
+const confettiCanvas=$(‘confetti’), cctx=confettiCanvas.getContext(‘2d’);
 
 let state={
-  level:0, gridN:5, pieces:[], img:null, customImg:null,
-  dragging:null, dragStartR:-1, dragStartC:-1, dragOffX:0, dragOffY:0,
-  cellW:0, cellH:0, canvasW:0, canvasH:0, dpr:1,
-  solved:false, prevShown:false, animFrame:0, autoTimer:null,
-  imgCache:{}, preloadQueue:[], preloading:false
+level:0, gridSize:4, pieces:[], img:null, imgLoaded:false,
+dragging:null, dragOffX:0, dragOffY:0, dragStartR:-1, dragStartC:-1,
+solved:false, prevShown:false, customImg:null, customLevel:false,
+returnLevel:0, animating:false,
+cellW:0, cellH:0, boardX:0, boardY:0, boardW:0, boardH:0,
+dpr:1
 };
 
-/* ============ IMAGE LOADING ============ */
-function getLevelURL(idx){
-  if(state.customImg) return null;
-  return LEVELS[idx%LEVELS.length];
+/* Preload cache */
+const imgCache=new Map();
+let preloadQueue=[], preloading=false;
+
+/* ─── DOM refs ─── */
+const btnPrev=$(‘btnPrev’), btnNext=$(‘btnNext’), btnStart=$(‘btnStart’);
+const btnShowOrig=$(‘btnShowOrig’), btnChoose=$(‘btnChoose’);
+const diffSelect=$(‘diffSelect’), levelDisplay=$(‘levelDisplay’);
+const overlay=$(‘overlay’), overlayImg=$(‘overlayImg’), closeOverlay=$(‘closeOverlay’);
+const canvasWrap=$(‘canvasWrap’), loadingInd=$(‘loadingInd’);
+const successText=$(‘successText’), fileInput=$(‘fileInput’);
+
+/* ─── Utility ─── */
+function shuffleArray(a){for(let i=a.length-1;i>0;i–){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ─── Image Loading ─── */
+function getLevelUrl(lvl){return IMAGE_URLS[lvl%TOTAL_LEVELS]}
+
+function loadImage(url){
+return new Promise((resolve,reject)=>{
+if(imgCache.has(url)){resolve(imgCache.get(url));return}
+const img=new Image();
+img.crossOrigin=‘anonymous’;
+img.onload=()=>{imgCache.set(url,img);resolve(img)};
+img.onerror=()=>{
+// retry once
+const img2=new Image();
+img2.crossOrigin=‘anonymous’;
+img2.onload=()=>{imgCache.set(url,img2);resolve(img2)};
+img2.onerror=()=>reject(new Error(‘Load failed’));
+img2.src=url+’?retry=’+Date.now();
+};
+img.src=url;
+});
 }
 
-function loadImage(src){
-  return new Promise((res,rej)=>{
-    if(state.imgCache[src]){res(state.imgCache[src]);return}
-    const im=new Image();
-    im.crossOrigin='anonymous';
-    im.onload=()=>{state.imgCache[src]=im;res(im)};
-    im.onerror=()=>rej(new Error('load fail'));
-    im.src=src;
-  });
+function startPreload(){
+if(preloading)return;
+preloadQueue=[];
+for(let i=1;i<=2;i++){
+const nl=(state.level+i)%TOTAL_LEVELS;
+const url=getLevelUrl(nl);
+if(!imgCache.has(url))preloadQueue.push(url);
+}
+preloadNext();
 }
 
 function preloadNext(){
-  if(state.preloading||state.preloadQueue.length===0) return;
-  state.preloading=true;
-  const src=state.preloadQueue.shift();
-  if(state.imgCache[src]){state.preloading=false;preloadNext();return}
-  const im=new Image();
-  im.crossOrigin='anonymous';
-  im.onload=()=>{state.imgCache[src]=im;state.preloading=false;preloadNext()};
-  im.onerror=()=>{state.preloading=false;preloadNext()};
-  im.src=src;
+if(preloadQueue.length===0){preloading=false;return}
+preloading=true;
+const url=preloadQueue.shift();
+if(imgCache.has(url)){preloadNext();return}
+const img=new Image();
+img.crossOrigin=‘anonymous’;
+img.onload=()=>{imgCache.set(url,img);preloadNext()};
+img.onerror=()=>preloadNext();
+img.src=url;
 }
 
-function schedulePreload(){
-  state.preloadQueue=[];
-  if(state.customImg) return;
-  for(let i=1;i<=2;i++){
-    const idx=(state.level+i)%LEVELS.length;
-    const url=LEVELS[idx];
-    if(!state.imgCache[url]) state.preloadQueue.push(url);
-  }
-  setTimeout(()=>preloadNext(),800);
+/* ─── Layout ─── */
+function calcLayout(){
+const dpr=Math.min(window.devicePixelRatio||1,3);
+state.dpr=dpr;
+const wrapRect=canvasWrap.getBoundingClientRect();
+const w=wrapRect.width, h=wrapRect.height;
+const pad=8;
+const availW=w-pad*2, availH=h-pad*2-40; // reserve 40 for success text
+const g=state.gridSize;
+
+// Compute board size maintaining image aspect ratio
+let imgAspect=4/5; // default
+if(state.img) imgAspect=state.img.naturalWidth/state.img.naturalHeight;
+
+let boardW,boardH;
+if(availW/availH < imgAspect){
+boardW=availW;
+boardH=boardW/imgAspect;
+} else {
+boardH=availH;
+boardW=boardH*imgAspect;
 }
 
-/* ============ PIECES ============ */
-function createPieces(n){
-  const arr=[];
-  for(let r=0;r<n;r++) for(let c=0;c<n;c++) arr.push({origR:r,origC:c,currentR:r,currentC:c,locked:false});
-  // shuffle unlocked
-  const indices=arr.map((_,i)=>i);
-  for(let i=indices.length-1;i>0;i--){
-    const j=Math.random()*i+1|0;
-    [indices[i],indices[j]]=[indices[j],indices[i]];
-  }
-  const positions=arr.map(p=>({r:p.currentR,c:p.currentC}));
-  const shuffled=indices.map(i=>positions[i]);
-  arr.forEach((p,i)=>{p.currentR=shuffled[i].r;p.currentC=shuffled[i].c});
-  // check already correct
-  arr.forEach(p=>{if(p.currentR===p.origR&&p.currentC===p.origC) p.locked=true});
-  // if all solved by chance, reshuffle (rare)
-  if(arr.every(p=>p.locked)){
-    arr[0].currentR=arr[1].origR;arr[0].currentC=arr[1].origC;arr[0].locked=false;
-    arr[1].currentR=arr[0].origR;arr[1].currentC=arr[0].origC;arr[1].locked=false;
-  }
-  return arr;
+state.boardW=boardW; state.boardH=boardH;
+state.boardX=(w-boardW)/2; state.boardY=(h-boardH-40)/2;
+state.cellW=boardW/g; state.cellH=boardH/g;
+
+canvas.style.width=w+‘px’; canvas.style.height=h+‘px’;
+canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
+confettiCanvas.style.width=w+‘px’; confettiCanvas.style.height=h+‘px’;
+confettiCanvas.width=Math.round(w*dpr); confettiCanvas.height=Math.round(h*dpr);
 }
 
-function pieceAt(r,c){return state.pieces.find(p=>p.currentR===r&&p.currentC===c)}
+/* ─── Piece Management ─── */
+function initPieces(){
+const g=state.gridSize;
+const positions=[];
+for(let r=0;r<g;r++) for(let c=0;c<g;c++) positions.push({r,c});
 
-/* ============ GROUP LOGIC ============ */
-function getGroup(piece){
-  if(piece.locked) return [piece];
-  const n=state.gridN, visited=new Set(), queue=[piece], group=[];
-  const key=p=>`${p.currentR},${p.currentC}`;
-  visited.add(key(piece));
-  while(queue.length){
-    const cur=queue.shift();
-    group.push(cur);
-    const dirs=[[0,1],[0,-1],[1,0],[-1,0]];
-    for(const [dr,dc] of dirs){
-      const nr=cur.currentR+dr, nc=cur.currentC+dc;
-      if(nr<0||nr>=n||nc<0||nc>=n) continue;
-      const nb=pieceAt(nr,nc);
-      if(!nb||nb.locked||visited.has(key(nb))) continue;
-      // check relative correctness
-      if(nb.origR-cur.origR===dr && nb.origC-cur.origC===dc){
-        visited.add(key(nb));
-        queue.push(nb);
-      }
-    }
-  }
-  return group.length>1?group:[piece];
+state.pieces=[];
+for(let r=0;r<g;r++){
+for(let c=0;c<g;c++){
+state.pieces.push({
+origR:r, origC:c,
+currentR:r, currentC:c,
+locked:false
+});
+}
 }
 
-function isInGroup(piece){
-  return getGroup(piece).length>1;
+// Shuffle currentR/currentC
+const shuffled=positions.slice();
+shuffleArray(shuffled);
+// Ensure solvable: if same as original, reshuffle
+let same=true;
+for(let i=0;i<state.pieces.length;i++){
+state.pieces[i].currentR=shuffled[i].r;
+state.pieces[i].currentC=shuffled[i].c;
+if(state.pieces[i].currentR!==state.pieces[i].origR||state.pieces[i].currentC!==state.pieces[i].origC) same=false;
+}
+if(same){
+// swap first two non-same
+const t=shuffled[0];
+shuffled[0]=shuffled[1];
+shuffled[1]=t;
+state.pieces[0].currentR=shuffled[0].r; state.pieces[0].currentC=shuffled[0].c;
+state.pieces[1].currentR=shuffled[1].r; state.pieces[1].currentC=shuffled[1].c;
 }
 
-/* ============ SIZING ============ */
-function resize(){
-  const dpr=Math.min(window.devicePixelRatio||1,3);
-  state.dpr=dpr;
-  const wrapW=canvasWrap.clientWidth-4, wrapH=canvasWrap.clientHeight-4;
-  if(!state.img){canvas.width=canvas.height=0;return}
-  const imgAsp=state.img.width/state.img.height;
-  let cw,ch;
-  if(wrapW/wrapH>imgAsp){ch=wrapH;cw=ch*imgAsp}else{cw=wrapW;ch=cw/imgAsp}
-  cw=Math.floor(cw);ch=Math.floor(ch);
-  // subtract space for success message
-  const maxH=wrapH-32;
-  if(ch>maxH){ch=maxH;cw=Math.floor(ch*imgAsp)}
-  state.canvasW=cw;state.canvasH=ch;
-  canvas.style.width=cw+'px';canvas.style.height=ch+'px';
-  canvas.width=cw*dpr;canvas.height=ch*dpr;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  state.cellW=cw/state.gridN;state.cellH=ch/state.gridN;
+// Check initial locks
+checkLocks();
+checkGroups();
 }
 
-/* ============ RENDER ============ */
+function getPieceAt(r,c){
+return state.pieces.find(p=>p.currentR===r&&p.currentC===c);
+}
+
+function checkLocks(){
+for(const p of state.pieces){
+if(!p.locked && p.currentR===p.origR && p.currentC===p.origC){
+p.locked=true;
+}
+}
+}
+
+/* ─── Group Logic ─── */
+function getGroups(){
+// Build adjacency for unlocked pieces with correct relative positions
+const g=state.gridSize;
+const unlocked=state.pieces.filter(p=>!p.locked);
+if(unlocked.length<=1) return [];
+
+// Union-Find
+const parent=new Map();
+const find=(p)=>{if(!parent.has(p))parent.set(p,p);if(parent.get(p)!==p)parent.set(p,find(parent.get(p)));return parent.get(p)};
+const union=(a,b)=>{const ra=find(a),rb=find(b);if(ra!==rb)parent.set(ra,rb)};
+
+for(const p of unlocked) parent.set(p,p);
+
+for(let i=0;i<unlocked.length;i++){
+for(let j=i+1;j<unlocked.length;j++){
+const a=unlocked[i], b=unlocked[j];
+// Check if they’re currently adjacent
+const dr=b.currentR-a.currentR, dc=b.currentC-a.currentC;
+if(Math.abs(dr)+Math.abs(dc)!==1) continue;
+// Check if their relative orig positions match
+const origDr=b.origR-a.origR, origDc=b.origC-a.origC;
+if(dr===origDr && dc===origDc) union(a,b);
+}
+}
+
+// Collect groups
+const groupMap=new Map();
+for(const p of unlocked){
+const root=find(p);
+if(!groupMap.has(root)) groupMap.set(root,[]);
+groupMap.get(root).push(p);
+}
+
+return Array.from(groupMap.values()).filter(g=>g.length>1);
+}
+
+function checkGroups(){
+state.groups=getGroups();
+// Mark pieces
+for(const p of state.pieces) p.inGroup=false;
+for(const grp of state.groups) for(const p of grp) p.inGroup=true;
+}
+
+function getGroupOf(piece){
+if(!state.groups)return null;
+for(const grp of state.groups) if(grp.includes(piece)) return grp;
+return null;
+}
+
+/* ─── Rendering ─── */
 function render(){
-  if(!state.img) return;
-  const {gridN:n,cellW:cw,cellH:ch,pieces,canvasW:W,canvasH:H}=state;
-  ctx.clearRect(0,0,W,H);
-  // determine groups for coloring
-  const groupMap=new Map();
-  pieces.forEach(p=>{
-    if(p.locked||groupMap.has(p)) return;
-    const g=getGroup(p);
-    if(g.length>1) g.forEach(m=>groupMap.set(m,g));
-  });
+const {dpr,boardX,boardY,boardW,boardH,cellW,cellH,gridSize:g,pieces,img}=state;
+ctx.setTransform(dpr,0,0,dpr,0,0);
+ctx.clearRect(0,0,canvas.width/dpr,canvas.height/dpr);
 
-  // sort for render: dragged group on top
-  const dragGroup=state.dragging?getGroup(state.dragging):[];
-  const dragSet=new Set(dragGroup);
-  const sorted=[...pieces].sort((a,b)=>{
-    const aD=dragSet.has(a)?1:0, bD=dragSet.has(b)?1:0;
-    return aD-bD;
-  });
+if(!img||!state.imgLoaded) return;
 
-  sorted.forEach(p=>{
-    let dx=p.currentC*cw, dy=p.currentR*ch;
-    if(dragSet.has(p)&&state.dragging){
-      const drP=state.dragging;
-      const offR=p.currentR-drP.currentR, offC=p.currentC-drP.currentC;
-      dx=state.dragX+offC*cw;
-      dy=state.dragY+offR*ch;
-    }
-    const sx=p.origC*(state.img.width/n), sy=p.origR*(state.img.height/n);
-    const sw=state.img.width/n, sh=state.img.height/n;
-    ctx.save();
-    ctx.beginPath();ctx.rect(dx,dy,cw,ch);ctx.clip();
-    ctx.drawImage(state.img,sx,sy,sw,sh,dx,dy,cw,ch);
-    ctx.restore();
-  });
+const srcW=img.naturalWidth/g, srcH=img.naturalHeight/g;
 
-  // borders
-  sorted.forEach(p=>{
-    let dx=p.currentC*cw, dy=p.currentR*ch;
-    if(dragSet.has(p)&&state.dragging){
-      const drP=state.dragging;
-      dx=state.dragX+(p.currentC-drP.currentC)*cw;
-      dy=state.dragY+(p.currentR-drP.currentR)*ch;
-    }
-    if(p.locked){
-      // green border, merge with adjacent locked
-      const edges=[[0,-1,'top'],[0,1,'bottom'],[-1,0,'left'],[1,0,'right']];
-      ctx.strokeStyle='#43a047';ctx.lineWidth=2;
-      const drawEdge=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
-      // top
-      const nbTop=pieceAt(p.currentR-1,p.currentC);
-      if(!nbTop||!nbTop.locked) drawEdge(dx,dy,dx+cw,dy);
-      // bottom
-      const nbBot=pieceAt(p.currentR+1,p.currentC);
-      if(!nbBot||!nbBot.locked) drawEdge(dx,dy+ch,dx+cw,dy+ch);
-      // left
-      const nbLeft=pieceAt(p.currentR,p.currentC-1);
-      if(!nbLeft||!nbLeft.locked) drawEdge(dx,dy,dx,dy+ch);
-      // right
-      const nbRight=pieceAt(p.currentR,p.currentC+1);
-      if(!nbRight||!nbRight.locked) drawEdge(dx+cw,dy,dx+cw,dy+ch);
-    } else if(groupMap.has(p)){
-      // yellow border, merge internal
-      const g=groupMap.get(p);
-      const gSet=new Set(g);
-      ctx.strokeStyle='#fdd835';ctx.lineWidth=2;
-      const drawEdge=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
-      const nbAt=(r,c)=>g.find(x=>x.currentR===r&&x.currentC===c);
-      if(!nbAt(p.currentR-1,p.currentC)) drawEdge(dx,dy,dx+cw,dy);
-      if(!nbAt(p.currentR+1,p.currentC)) drawEdge(dx,dy+ch,dx+cw,dy+ch);
-      if(!nbAt(p.currentR,p.currentC-1)) drawEdge(dx,dy,dx,dy+ch);
-      if(!nbAt(p.currentR,p.currentC+1)) drawEdge(dx+cw,dy,dx+cw,dy+ch);
-    } else {
-      ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=1;
-      ctx.strokeRect(dx,dy,cw,ch);
-    }
-  });
+// Determine render order: dragging group on top
+let normalPieces=[], topPieces=[];
+const dragGroup=state.dragging?getGroupOf(state.dragging):null;
 
-  // highlight target
-  if(state.dragging){
-    const group=dragGroup;
-    const drP=state.dragging;
-    const targetR=Math.round(state.dragY/ch), targetC=Math.round(state.dragX/cw);
-    group.forEach(p=>{
-      const tr=targetR+(p.currentR-drP.currentR), tc=targetC+(p.currentC-drP.currentC);
-      if(tr>=0&&tr<n&&tc>=0&&tc<n){
-        ctx.fillStyle='rgba(79,195,247,.2)';ctx.fillRect(tc*cw,tr*ch,cw,ch);
-        ctx.strokeStyle='rgba(79,195,247,.6)';ctx.lineWidth=2;ctx.strokeRect(tc*cw,tr*ch,cw,ch);
-      }
-    });
-    // shadow on dragged
-    group.forEach(p=>{
-      const dx2=state.dragX+(p.currentC-drP.currentC)*cw;
-      const dy2=state.dragY+(p.currentR-drP.currentR)*ch;
-      ctx.save();ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=12;ctx.shadowOffsetY=4;
-      ctx.fillStyle='rgba(0,0,0,.01)';ctx.fillRect(dx2,dy2,cw,ch);ctx.restore();
-    });
-  }
-
-  if(state.solved){
-    ctx.drawImage(state.img,0,0,W,H);
-  }
+for(const p of pieces){
+if(dragGroup && dragGroup.includes(p)) topPieces.push(p);
+else if(state.dragging===p) topPieces.push(p);
+else normalPieces.push(p);
 }
 
-/* ============ INTEGRITY CHECK ============ */
+const renderList=[…normalPieces,…topPieces];
+
+// Draw highlight for target position
+if(state.dragging && state.dragTargetR!==undefined && state.dragTargetR>=0){
+const group=dragGroup||[state.dragging];
+const anchorP=state.dragging;
+for(const p of group){
+const offR=p.currentR-anchorP.currentR;
+const offC=p.currentC-anchorP.currentC;
+const tr=state.dragTargetR+offR, tc=state.dragTargetC+offC;
+if(tr>=0&&tr<g&&tc>=0&&tc<g){
+ctx.fillStyle=‘rgba(59,130,246,0.25)’;
+ctx.fillRect(boardX+tc*cellW, boardY+tr*cellH, cellW, cellH);
+}
+}
+}
+
+// Build locked neighbor map for border merging
+const lockedSet=new Set();
+for(const p of pieces) if(p.locked) lockedSet.add(p.currentR+’,’+p.currentC);
+
+// Draw pieces
+for(const p of renderList){
+let dx,dy;
+if((state.dragging===p||(dragGroup&&dragGroup.includes(p)))&&state.dragging){
+const anchorP=state.dragging;
+const offR=p.currentR-anchorP.currentR;
+const offC=p.currentC-anchorP.currentC;
+dx=state.dragX+offC*cellW;
+dy=state.dragY+offR*cellH;
+} else {
+dx=boardX+p.currentC*cellW;
+dy=boardY+p.currentR*cellH;
+}
+
+```
+const sx=p.origC*srcW, sy=p.origR*srcH;
+
+ctx.save();
+ctx.beginPath();
+ctx.rect(dx,dy,cellW,cellH);
+ctx.clip();
+ctx.drawImage(img, sx,sy,srcW,srcH, dx,dy,cellW,cellH);
+ctx.restore();
+
+// Border
+if(p.locked){
+  // Merged green borders
+  const r=p.currentR,c=p.currentC;
+  ctx.strokeStyle='#22c55e';
+  ctx.lineWidth=2.5;
+  // Top
+  if(!lockedSet.has((r-1)+','+c)){ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx+cellW,dy);ctx.stroke()}
+  // Bottom
+  if(!lockedSet.has((r+1)+','+c)){ctx.beginPath();ctx.moveTo(dx,dy+cellH);ctx.lineTo(dx+cellW,dy+cellH);ctx.stroke()}
+  // Left
+  if(!lockedSet.has(r+','+(c-1))){ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx,dy+cellH);ctx.stroke()}
+  // Right
+  if(!lockedSet.has(r+','+(c+1))){ctx.beginPath();ctx.moveTo(dx+cellW,dy);ctx.lineTo(dx+cellW,dy+cellH);ctx.stroke()}
+} else if(p.inGroup){
+  // Yellow merged borders for group
+  const group=getGroupOf(p);
+  const groupSet=new Set();
+  if(group) for(const gp of group) groupSet.add(gp.currentR+','+gp.currentC);
+  
+  ctx.strokeStyle='#eab308';
+  ctx.lineWidth=2;
+  const r=p.currentR, c=p.currentC;
+  if(!groupSet.has((r-1)+','+c)){ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx+cellW,dy);ctx.stroke()}
+  if(!groupSet.has((r+1)+','+c)){ctx.beginPath();ctx.moveTo(dx,dy+cellH);ctx.lineTo(dx+cellW,dy+cellH);ctx.stroke()}
+  if(!groupSet.has(r+','+(c-1))){ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx,dy+cellH);ctx.stroke()}
+  if(!groupSet.has(r+','+(c+1))){ctx.beginPath();ctx.moveTo(dx+cellW,dy);ctx.lineTo(dx+cellW,dy+cellH);ctx.stroke()}
+} else {
+  // White border
+  ctx.strokeStyle='rgba(255,255,255,0.35)';
+  ctx.lineWidth=1;
+  ctx.strokeRect(dx,dy,cellW,cellH);
+}
+
+// Shadow for dragging
+if(state.dragging===p||(dragGroup&&dragGroup.includes(p)&&state.dragging)){
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.5)';
+  ctx.shadowBlur=16;
+  ctx.shadowOffsetY=4;
+  ctx.strokeStyle='rgba(59,130,246,0.6)';
+  ctx.lineWidth=2;
+  ctx.strokeRect(dx,dy,cellW,cellH);
+  ctx.restore();
+}
+```
+
+}
+}
+
+/* ─── Integrity Check ─── */
 function integrityCheck(){
-  const n=state.gridN, occ=new Map();
-  state.pieces.forEach(p=>{
-    const k=`${p.currentR},${p.currentC}`;
-    if(occ.has(k)){
-      // push this piece to nearest free
-      const taken=new Set(state.pieces.map(x=>`${x.currentR},${x.currentC}`));
-      for(let r=0;r<n;r++) for(let c=0;c<n;c++){
-        const kk=`${r},${c}`;
-        if(!taken.has(kk)||(r===p.currentR&&c===p.currentC&&[...occ.values()].filter(v=>v===kk).length<2)){
-          // find truly free
-          const countAt=state.pieces.filter(x=>x.currentR===r&&x.currentC===c).length;
-          if(countAt===0){p.currentR=r;p.currentC=c;return}
-        }
-      }
-    }else{occ.set(k,k)}
-  });
+const g=state.gridSize;
+const occupied=new Map();
+for(const p of state.pieces){
+const key=p.currentR+’,’+p.currentC;
+if(occupied.has(key)){
+// Conflict! Push this piece to nearest empty
+const existing=occupied.get(key);
+pushToEmpty(p,g);
+}
+occupied.set(key,p);
+}
 }
 
-/* ============ INTERACTION ============ */
-function getXY(e){
-  const t=e.touches?e.touches[0]||e.changedTouches[0]:e;
-  const rect=canvas.getBoundingClientRect();
-  return{x:t.clientX-rect.left,y:t.clientY-rect.top};
+function pushToEmpty(piece,g){
+const usedSet=new Set(state.pieces.filter(p=>p!==piece).map(p=>p.currentR+’,’+p.currentC));
+let bestDist=Infinity, bestR=0, bestC=0;
+for(let r=0;r<g;r++){
+for(let c=0;c<g;c++){
+if(!usedSet.has(r+’,’+c)){
+const d=Math.abs(r-piece.currentR)+Math.abs(c-piece.currentC);
+if(d<bestDist){bestDist=d;bestR=r;bestC=c}
+}
+}
+}
+piece.currentR=bestR; piece.currentC=bestC;
+}
+
+/* ─── Drag Handling ─── */
+function getCanvasPos(e){
+const rect=canvas.getBoundingClientRect();
+const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+const y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+return {x,y};
 }
 
 function handleStart(e){
-  e.preventDefault();
-  if(state.solved) return;
-  const {x,y}=getXY(e);
-  const c=Math.floor(x/state.cellW), r=Math.floor(y/state.cellH);
-  if(r<0||r>=state.gridN||c<0||c>=state.gridN) return;
-  const p=pieceAt(r,c);
-  if(!p||p.locked) return;
-  const group=getGroup(p);
-  state.dragging=p;
-  state.dragStartR=r;state.dragStartC=c;
-  state.dragX=x-state.cellW/2;
-  state.dragY=y-state.cellH/2;
-  state.dragOffX=x-p.currentC*state.cellW;
-  state.dragOffY=y-p.currentR*state.cellH;
-  render();
+e.preventDefault();
+if(state.solved||!state.imgLoaded) return;
+
+const {x,y}=getCanvasPos(e);
+const {boardX,boardY,cellW,cellH,gridSize:g}=state;
+
+const col=Math.floor((x-boardX)/cellW);
+const row=Math.floor((y-boardY)/cellH);
+if(row<0||row>=g||col<0||col>=g) return;
+
+const piece=getPieceAt(row,col);
+if(!piece||piece.locked) return;
+
+state.dragging=piece;
+state.dragStartR=piece.currentR;
+state.dragStartC=piece.currentC;
+state.dragOffX=x-(boardX+col*cellW);
+state.dragOffY=y-(boardY+row*cellH);
+state.dragX=boardX+col*cellW;
+state.dragY=boardY+row*cellH;
+state.dragTargetR=row;
+state.dragTargetC=col;
+
+render();
 }
 
 function handleMove(e){
-  e.preventDefault();
-  if(!state.dragging) return;
-  const {x,y}=getXY(e);
-  state.dragX=x-state.dragOffX+state.dragging.currentC*state.cellW-state.dragging.currentC*state.cellW;
-  state.dragX=x-state.cellW/2;
-  state.dragY=y-state.cellH/2;
-  render();
+e.preventDefault();
+if(!state.dragging) return;
+
+const pos=e.touches?{x:e.touches[0].clientX-canvas.getBoundingClientRect().left,y:e.touches[0].clientY-canvas.getBoundingClientRect().top}:getCanvasPos(e);
+const {boardX,boardY,cellW,cellH,gridSize:g}=state;
+
+state.dragX=pos.x-state.dragOffX;
+state.dragY=pos.y-state.dragOffY;
+
+// Calculate target cell
+const centerX=state.dragX+cellW/2;
+const centerY=state.dragY+cellH/2;
+let tCol=Math.floor((centerX-boardX)/cellW);
+let tRow=Math.floor((centerY-boardY)/cellH);
+tCol=Math.max(0,Math.min(g-1,tCol));
+tRow=Math.max(0,Math.min(g-1,tRow));
+
+state.dragTargetR=tRow;
+state.dragTargetC=tCol;
+
+render();
 }
 
 function handleEnd(e){
-  e.preventDefault();
-  if(!state.dragging) return;
-  const {cellW:cw,cellH:ch,gridN:n}=state;
-  const drP=state.dragging;
-  const group=getGroup(drP);
-  let targetR=Math.round(state.dragY/ch), targetC=Math.round(state.dragX/cw);
+e.preventDefault();
+if(!state.dragging) return;
 
-  // clamp group within bounds
-  const minDR=Math.min(...group.map(p=>p.currentR-drP.currentR));
-  const maxDR=Math.max(...group.map(p=>p.currentR-drP.currentR));
-  const minDC=Math.min(...group.map(p=>p.currentC-drP.currentC));
-  const maxDC=Math.max(...group.map(p=>p.currentC-drP.currentC));
-  targetR=Math.max(-minDR,Math.min(n-1-maxDR,targetR));
-  targetC=Math.max(-minDC,Math.min(n-1-maxDC,targetC));
+const piece=state.dragging;
+const g=state.gridSize;
+let targetR=state.dragTargetR, targetC=state.dragTargetC;
 
-  // if dropped back on self
-  if(targetR===drP.currentR&&targetC===drP.currentC){
-    state.dragging=null;render();return;
+if(targetR===undefined||targetR<0) targetR=piece.currentR;
+if(targetC===undefined||targetC<0) targetC=piece.currentC;
+
+const group=getGroupOf(piece);
+
+if(group && group.length>1){
+// ── Group swap: atomic multi-piece exchange ──
+// Calculate offsets from anchor piece
+const offsets=group.map(p=>({
+piece:p,
+dr:p.currentR-piece.currentR,
+dc:p.currentC-piece.currentC
+}));
+
+```
+// Desired new positions for group members
+let newPositions=offsets.map(o=>({r:targetR+o.dr, c:targetC+o.dc, piece:o.piece}));
+
+// Boundary check & adjust (auto-clip)
+let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
+for(const np of newPositions){
+  minR=Math.min(minR,np.r); maxR=Math.max(maxR,np.r);
+  minC=Math.min(minC,np.c); maxC=Math.max(maxC,np.c);
+}
+let shiftR=0, shiftC=0;
+if(minR<0) shiftR=-minR;
+if(maxR>=g) shiftR=g-1-maxR;
+if(minC<0) shiftC=-minC;
+if(maxC>=g) shiftC=g-1-maxC;
+
+newPositions=newPositions.map(np=>({...np, r:np.r+shiftR, c:np.c+shiftC}));
+
+// Check if any target position has a locked piece
+let blocked=false;
+for(const np of newPositions){
+  const target=getPieceAt(np.r, np.c);
+  if(target && target.locked && !group.includes(target)){
+    blocked=true; break;
   }
+}
 
-  // compute new positions for group
-  const groupNewPos=group.map(p=>({
-    piece:p,
-    newR:targetR+(p.currentR-drP.currentR),
-    newC:targetC+(p.currentC-drP.currentC)
-  }));
-
-  // check if any target overlaps locked piece
-  const lockedConflict=groupNewPos.some(({newR,newC})=>{
-    const t=pieceAt(newR,newC);
-    return t&&t.locked&&!group.includes(t);
-  });
-  if(lockedConflict){state.dragging=null;render();return}
-
-  // gather target pieces (pieces currently in target positions, not in group)
-  const groupSet=new Set(group);
-  const targetPieces=[];
-  groupNewPos.forEach(({newR,newC})=>{
-    const t=pieceAt(newR,newC);
-    if(t&&!groupSet.has(t)) targetPieces.push(t);
-  });
-
-  // atomic swap: record old positions
-  const groupOld=group.map(p=>({piece:p,r:p.currentR,c:p.currentC}));
-  const targetOld=targetPieces.map(p=>({piece:p,r:p.currentR,c:p.currentC}));
-
-  // build position mapping
-  // group pieces move to new positions
-  // target pieces fill vacated positions
-  // if counts don't match, fill remaining to nearest free
-
-  // step 1: assign group new positions
-  const occupied=new Set();
-  state.pieces.forEach(p=>{if(!groupSet.has(p)&&!targetPieces.includes(p)) occupied.add(`${p.currentR},${p.currentC}`)});
-
-  groupNewPos.forEach(({piece,newR,newC})=>{
-    piece.currentR=newR;piece.currentC=newC;
-    occupied.add(`${newR},${newC}`);
-  });
-
-  // step 2: assign target pieces to vacated spots
-  const vacated=groupOld.map(o=>`${o.r},${o.c}`).filter(k=>!occupied.has(k));
-  targetPieces.forEach((tp,i)=>{
-    if(i<vacated.length){
-      const [r,c]=vacated[i].split(',').map(Number);
-      tp.currentR=r;tp.currentC=c;
-      occupied.add(`${r},${c}`);
-    }else{
-      // find free
-      for(let rr=0;rr<n;rr++) for(let cc=0;cc<n;cc++){
-        const k=`${rr},${cc}`;
-        if(!occupied.has(k)){tp.currentR=rr;tp.currentC=cc;occupied.add(k);rr=n;break}
-      }
-    }
-  });
-
-  // check locks
-  state.pieces.forEach(p=>{
-    if(!p.locked&&p.currentR===p.origR&&p.currentC===p.origC) p.locked=true;
-  });
-
-  integrityCheck();
+if(blocked || (targetR===state.dragStartR && targetC===state.dragStartC)){
+  // Snap back
   state.dragging=null;
+  state.dragTargetR=-1; state.dragTargetC=-1;
   render();
-  checkWin();
+  return;
 }
 
-/* ============ WIN CHECK ============ */
-function checkWin(){
-  if(state.pieces.every(p=>p.locked)){
-    state.solved=true;
-    successMsg.classList.add('show');
-    render();
-    launchConfetti();
-    state.autoTimer=setTimeout(()=>{
-      successMsg.classList.remove('show');
-      nextLevel();
-    },3200);
+// Atomic swap: record old positions of group and targets
+const groupOldPositions=group.map(p=>({piece:p, r:p.currentR, c:p.currentC}));
+const groupNewPosSet=new Set(newPositions.map(np=>np.r+','+np.c));
+const groupOldPosSet=new Set(groupOldPositions.map(gp=>gp.r+','+gp.c));
+
+// Find target pieces (not in group) that are in the new positions
+const displaced=[];
+for(const np of newPositions){
+  const target=getPieceAt(np.r, np.c);
+  if(target && !group.includes(target)){
+    displaced.push(target);
   }
 }
 
-/* ============ CONFETTI ============ */
-function launchConfetti(){
-  const c2=document.createElement('canvas');
-  c2.className='confetti-canvas';
-  document.body.appendChild(c2);
-  const ctx2=c2.getContext('2d');
-  c2.width=window.innerWidth;c2.height=window.innerHeight;
-  const particles=[];
-  const colors=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6eb4','#a855f7','#f97316'];
-  for(let i=0;i<150;i++){
-    particles.push({
-      x:Math.random()*c2.width,y:Math.random()*c2.height*-.5-50,
-      w:Math.random()*8+4,h:Math.random()*6+2,
-      color:colors[Math.random()*colors.length|0],
-      vx:(Math.random()-.5)*4,vy:Math.random()*3+2,
-      rot:Math.random()*360,rv:(Math.random()-.5)*10,
-      life:1
-    });
-  }
-  let start=performance.now();
-  function tick(t){
-    const dt=(t-start)/1000;start=t;
-    ctx2.clearRect(0,0,c2.width,c2.height);
-    let alive=false;
-    particles.forEach(p=>{
-      p.x+=p.vx;p.y+=p.vy;p.vy+=3*dt;p.rot+=p.rv;p.life-=dt*.35;
-      if(p.life<=0) return;
-      alive=true;
-      ctx2.save();ctx2.translate(p.x,p.y);ctx2.rotate(p.rot*Math.PI/180);
-      ctx2.globalAlpha=Math.max(0,p.life);
-      ctx2.fillStyle=p.color;ctx2.fillRect(-p.w/2,-p.h/2,p.w,p.h);
-      ctx2.restore();
-    });
-    if(alive) requestAnimationFrame(tick);
-    else{c2.remove()}
-  }
-  requestAnimationFrame(tick);
-}
+// Freed positions = old group positions not occupied by new group positions
+const freedPositions=groupOldPositions
+  .filter(gp=>!groupNewPosSet.has(gp.r+','+gp.c))
+  .map(gp=>({r:gp.r, c:gp.c}));
 
-/* ============ GAME FLOW ============ */
-async function loadLevel(idx){
-  state.solved=false;state.dragging=null;
-  successMsg.classList.remove('show');
-  if(state.autoTimer){clearTimeout(state.autoTimer);state.autoTimer=null}
-  state.level=idx;
-  levelLabel.textContent=`第 ${idx+1} 关`;
+// Move group to new positions
+for(const np of newPositions) np.piece.currentR=np.r; 
+for(const np of newPositions) np.piece.currentC=np.c;
 
-  loadingEl.classList.add('show');
-  btnShowImg.classList.add('hide');
-
-  try{
-    const src=state.customImg?null:LEVELS[idx%LEVELS.length];
-    if(state.customImg){
-      state.img=state.customImg;
-    }else{
-      state.img=await loadImage(src);
-    }
-    loadingEl.classList.remove('show');
-    btnShowImg.classList.remove('hide');
-    state.pieces=createPieces(state.gridN);
-    resize();
-    render();
-    schedulePreload();
-  }catch(e){
-    loadingEl.textContent='图片加载失败，重试中...';
-    setTimeout(()=>loadLevel(idx),1500);
+// Assign displaced pieces to freed positions
+for(let i=0;i<displaced.length;i++){
+  if(i<freedPositions.length){
+    displaced[i].currentR=freedPositions[i].r;
+    displaced[i].currentC=freedPositions[i].c;
   }
 }
+```
 
-function nextLevel(){
-  state.prevShown=true;
-  btnPrev.classList.remove('hide');
-  loadLevel(state.level+1);
+} else {
+// ── Single piece swap ──
+const targetPiece=getPieceAt(targetR, targetC);
+
+```
+if(targetPiece && targetPiece.locked){
+  state.dragging=null;
+  state.dragTargetR=-1; state.dragTargetC=-1;
+  render();
+  return;
 }
 
-function prevLevel(){
-  if(state.level>0) loadLevel(state.level-1);
+if(targetPiece && targetPiece!==piece){
+  // Swap
+  const tmpR=piece.currentR, tmpC=piece.currentC;
+  piece.currentR=targetPiece.currentR;
+  piece.currentC=targetPiece.currentC;
+  targetPiece.currentR=tmpR;
+  targetPiece.currentC=tmpC;
+} else if(!targetPiece){
+  piece.currentR=targetR;
+  piece.currentC=targetC;
+}
+```
+
 }
 
-/* ============ EVENT BINDINGS ============ */
-canvas.addEventListener('mousedown',handleStart);
-canvas.addEventListener('mousemove',handleMove);
-canvas.addEventListener('mouseup',handleEnd);
-canvas.addEventListener('mouseleave',e=>{if(state.dragging)handleEnd(e)});
-canvas.addEventListener('touchstart',handleStart,{passive:false});
-canvas.addEventListener('touchmove',handleMove,{passive:false});
-canvas.addEventListener('touchend',handleEnd,{passive:false});
-canvas.addEventListener('touchcancel',handleEnd,{passive:false});
+state.dragging=null;
+state.dragTargetR=-1; state.dragTargetC=-1;
 
-// prevent pull-to-refresh
-document.addEventListener('touchmove',e=>{
-  if(e.target===canvas||canvas.contains(e.target)) e.preventDefault();
-},{passive:false});
-document.body.addEventListener('touchmove',e=>{
-  e.preventDefault();
-},{passive:false});
+integrityCheck();
+checkLocks();
+checkGroups();
+render();
 
-btnNext.addEventListener('click',()=>{
-  if(state.autoTimer){clearTimeout(state.autoTimer);state.autoTimer=null}
-  successMsg.classList.remove('show');
-  nextLevel();
+// Check win
+if(state.pieces.every(p=>p.locked)){
+onWin();
+}
+}
+
+/* ─── Win ─── */
+function onWin(){
+if(state.solved) return;
+state.solved=true;
+successText.classList.add(‘show’);
+startConfetti();
+
+// Auto advance after 3s
+setTimeout(()=>{
+successText.classList.remove(‘show’);
+stopConfetti();
+if(!state.customLevel){
+goNextLevel();
+}
+},3000);
+}
+
+/* ─── Confetti ─── */
+let confettiParts=[], confettiAnim=null;
+function startConfetti(){
+const w=confettiCanvas.width/state.dpr, h=confettiCanvas.height/state.dpr;
+confettiParts=[];
+for(let i=0;i<120;i++){
+confettiParts.push({
+x:Math.random()*w, y:Math.random()*h-h,
+w:Math.random()*8+4, h:Math.random()*6+3,
+color:`hsl(${Math.random()*360},85%,60%)`,
+vx:(Math.random()-.5)*3, vy:Math.random()*4+2,
+rot:Math.random()*Math.PI*2, vr:(Math.random()-.5)*.2
+});
+}
+animateConfetti();
+}
+function animateConfetti(){
+const dpr=state.dpr;
+cctx.setTransform(dpr,0,0,dpr,0,0);
+cctx.clearRect(0,0,confettiCanvas.width/dpr,confettiCanvas.height/dpr);
+const h=confettiCanvas.height/dpr;
+let alive=false;
+for(const p of confettiParts){
+p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.vy+=.05;
+if(p.y<h+20) alive=true;
+cctx.save();
+cctx.translate(p.x,p.y);
+cctx.rotate(p.rot);
+cctx.fillStyle=p.color;
+cctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+cctx.restore();
+}
+if(alive) confettiAnim=requestAnimationFrame(animateConfetti);
+}
+function stopConfetti(){
+if(confettiAnim) cancelAnimationFrame(confettiAnim);
+cctx.setTransform(state.dpr,0,0,state.dpr,0,0);
+cctx.clearRect(0,0,confettiCanvas.width/state.dpr,confettiCanvas.height/state.dpr);
+confettiParts=[];
+}
+
+/* ─── Level Management ─── */
+function updateLevelDisplay(){
+if(state.customLevel){
+levelDisplay.textContent=‘自定义关卡’;
+} else {
+levelDisplay.textContent=`第 ${state.level+1} 关`;
+}
+}
+
+async function loadLevel(lvl, customImgSrc){
+state.solved=false;
+state.imgLoaded=false;
+state.dragging=null;
+state.groups=[];
+successText.classList.remove(‘show’);
+stopConfetti();
+btnShowOrig.classList.add(‘btn-hidden’);
+loadingInd.style.display=‘flex’;
+
+if(customImgSrc){
+state.customLevel=true;
+state.customImg=customImgSrc;
+} else {
+state.customLevel=false;
+state.customImg=null;
+state.level=lvl;
+}
+
+updateLevelDisplay();
+
+try{
+let img;
+if(customImgSrc){
+// Custom image from file
+img=new Image();
+img.src=customImgSrc;
+await new Promise((res,rej)=>{img.onload=res;img.onerror=rej});
+} else {
+img=await loadImage(getLevelUrl(lvl));
+}
+state.img=img;
+state.imgLoaded=true;
+loadingInd.style.display=‘none’;
+btnShowOrig.classList.remove(‘btn-hidden’);
+
+```
+calcLayout();
+initPieces();
+render();
+
+// Start preloading after 500ms
+if(!customImgSrc) setTimeout(startPreload,500);
+```
+
+} catch(err){
+loadingInd.style.display=‘none’;
+console.error(‘Image load error:’,err);
+// Try next image
+if(!customImgSrc){
+state.level=(state.level+1)%TOTAL_LEVELS;
+loadLevel(state.level);
+}
+}
+}
+
+function goNextLevel(){
+if(state.customLevel){
+// Return to the stored return level’s next
+state.customLevel=false;
+state.customImg=null;
+}
+const next=(state.level+1)%TOTAL_LEVELS;
+state.prevShown=true;
+btnPrev.classList.remove(‘btn-hidden’);
+loadLevel(next);
+}
+
+function goPrevLevel(){
+const prev=(state.level-1+TOTAL_LEVELS)%TOTAL_LEVELS;
+loadLevel(prev);
+}
+
+/* ─── Event Listeners ─── */
+// Touch/Mouse on canvas
+canvas.addEventListener(‘mousedown’,handleStart,{passive:false});
+canvas.addEventListener(‘mousemove’,handleMove,{passive:false});
+canvas.addEventListener(‘mouseup’,handleEnd,{passive:false});
+canvas.addEventListener(‘mouseleave’,handleEnd,{passive:false});
+canvas.addEventListener(‘touchstart’,handleStart,{passive:false});
+canvas.addEventListener(‘touchmove’,handleMove,{passive:false});
+canvas.addEventListener(‘touchend’,handleEnd,{passive:false});
+canvas.addEventListener(‘touchcancel’,handleEnd,{passive:false});
+
+// Prevent page scroll/bounce
+document.addEventListener(‘touchmove’,e=>e.preventDefault(),{passive:false});
+document.addEventListener(‘gesturestart’,e=>e.preventDefault(),{passive:false});
+
+// Buttons
+btnNext.addEventListener(‘click’,()=>{
+stopConfetti();
+successText.classList.remove(‘show’);
+state.returnLevel=state.level;
+goNextLevel();
 });
 
-btnPrev.addEventListener('click',()=>prevLevel());
-
-btnStart.addEventListener('click',()=>{
-  state.pieces=createPieces(state.gridN);
-  state.solved=false;
-  successMsg.classList.remove('show');
-  if(state.autoTimer){clearTimeout(state.autoTimer);state.autoTimer=null}
-  resize();render();
+btnPrev.addEventListener(‘click’,()=>{
+goPrevLevel();
 });
 
-diffSelect.addEventListener('change',()=>{
-  state.gridN=parseInt(diffSelect.value);
-  if(state.img){
-    state.pieces=createPieces(state.gridN);
-    state.solved=false;
-    successMsg.classList.remove('show');
-    if(state.autoTimer){clearTimeout(state.autoTimer);state.autoTimer=null}
-    resize();render();
-  }
+btnStart.addEventListener(‘click’,()=>{
+state.gridSize=parseInt(diffSelect.value);
+if(state.customLevel){
+loadLevel(state.level, state.customImg);
+} else {
+loadLevel(state.level);
+}
 });
 
-btnShowImg.addEventListener('click',()=>{
-  if(!state.img) return;
-  // create temp canvas for full image
-  const tc=document.createElement('canvas');
-  tc.width=state.img.width;tc.height=state.img.height;
-  tc.getContext('2d').drawImage(state.img,0,0);
-  overlayImg.src=tc.toDataURL();
-  overlayEl.classList.add('show');
-});
-overlayClose.addEventListener('click',()=>overlayEl.classList.remove('show'));
-overlayEl.addEventListener('click',e=>{if(e.target===overlayEl) overlayEl.classList.remove('show')});
-
-btnUpload.addEventListener('click',()=>fileInput.click());
-fileInput.addEventListener('change',e=>{
-  const f=e.target.files[0];
-  if(!f) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    const im=new Image();
-    im.onload=()=>{
-      state.customImg=im;
-      loadLevel(state.level);
-    };
-    im.src=ev.target.result;
-  };
-  reader.readAsDataURL(f);
-  fileInput.value='';
+diffSelect.addEventListener(‘change’,()=>{
+state.gridSize=parseInt(diffSelect.value);
+if(state.customLevel){
+loadLevel(state.level, state.customImg);
+} else {
+loadLevel(state.level);
+}
 });
 
-window.addEventListener('resize',()=>{resize();render()});
+btnShowOrig.addEventListener(‘click’,()=>{
+if(!state.img) return;
+overlayImg.src=state.customImg||state.img.src;
+overlay.classList.add(‘show’);
+});
 
-/* ============ INIT ============ */
+closeOverlay.addEventListener(‘click’,()=>{overlay.classList.remove(‘show’)});
+overlay.addEventListener(‘click’,(e)=>{if(e.target===overlay)overlay.classList.remove(‘show’)});
+
+btnChoose.addEventListener(‘click’,()=>fileInput.click());
+fileInput.addEventListener(‘change’,e=>{
+const file=e.target.files[0];
+if(!file) return;
+const reader=new FileReader();
+reader.onload=ev=>{
+state.returnLevel=state.level;
+state.gridSize=parseInt(diffSelect.value);
+loadLevel(state.level, ev.target.result);
+};
+reader.readAsDataURL(file);
+fileInput.value=’’;
+});
+
+// Resize
+let resizeTimer;
+window.addEventListener(‘resize’,()=>{
+clearTimeout(resizeTimer);
+resizeTimer=setTimeout(()=>{
+calcLayout();
+render();
+},100);
+});
+
+// Init
+state.gridSize=parseInt(diffSelect.value);
 loadLevel(0);
 
 })();
