@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>拼图小游戏 v2.3 关卡联动版</title>
+    <title>拼图小游戏 v2.4</title>
     <style>
         :root {
             --primary: #007aff;
             --success: #1d7a2a;
             --bg: #f5f5f7;
             --white: #ffffff;
-            --row-h: 34px;
+            --row-h: 36px;
         }
 
-        /* 视口锁定：100dvh 解决动态工具栏问题 */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body, html {
             margin: 0; padding: 0;
@@ -28,60 +27,63 @@
             display: flex;
             flex-direction: column;
             width: 100%; height: 100dvh;
-            padding: env(safe-area-inset-top) 5px env(safe-area-inset-bottom) 5px;
+            padding: env(safe-area-inset-top) 8px env(safe-area-inset-bottom) 8px;
         }
 
-        /* 顶部 UI 管理：强制压缩至三行内 */
+        /* 顶部 UI：严格三行 */
         #header-ui { flex-shrink: 0; padding-top: 5px; }
         .ui-row { 
             display: flex; align-items: center; justify-content: space-between; 
-            height: var(--row-h); margin-bottom: 4px; gap: 5px;
+            height: var(--row-h); margin-bottom: 4px; gap: 6px;
         }
         .title { font-size: 0.9rem; font-weight: bold; color: #333; }
-        .lvl-info { font-size: 0.85rem; color: var(--primary); font-weight: bold; }
+        .lvl-info { font-size: 0.85rem; color: var(--primary); font-weight: bold; flex: 1; text-align: center; }
 
         button, select {
-            padding: 4px 10px; font-size: 13px; border-radius: 6px;
+            padding: 4px 8px; font-size: 13px; border-radius: 8px;
             border: 1px solid #d1d1d6; background: var(--white); cursor: pointer;
             white-space: nowrap;
         }
-        button:active { background: #f2f2f7; opacity: 0.8; }
-        #btn-origin { background: var(--primary); color: white; border: none; visibility: hidden; }
+        button:active { opacity: 0.7; transform: scale(0.95); }
+        
+        /* 动态按钮状态 */
+        #btn-prev { display: none; } /* 初始隐藏 */
+        #btn-origin { visibility: hidden; background: var(--primary); color: white; border: none; }
 
-        /* 中部游戏区：动态挤压逻辑 */
+        /* 游戏区域 */
         #game-area {
             flex: 1; display: flex; justify-content: center; align-items: center;
-            min-height: 0; overflow: hidden; padding: 5px;
+            min-height: 0; overflow: hidden; position: relative;
         }
         canvas {
             background-color: #fff;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             display: block;
             image-rendering: -webkit-optimize-contrast;
         }
 
-        /* 底部成功区：固定 80px */
+        /* 底部成功区 */
         #footer-ui {
             height: 80px; flex-shrink: 0;
             display: flex; justify-content: center; align-items: center;
         }
         #success-msg {
             font-size: 32px; font-weight: bold; color: var(--success);
-            opacity: 0; transform: translateY(15px);
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0; transform: translateY(10px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         #success-msg.show { opacity: 1; transform: translateY(0); }
 
-        /* 原图预览遮罩 */
+        /* 原图遮罩 */
         #modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 1000;
             justify-content: center; align-items: center;
         }
-        #modal img { max-width: 90%; max-height: 80%; border: 2px solid #fff; }
+        #modal img { max-width: 90%; max-height: 80%; border: 2px solid #fff; object-fit: contain; }
         #close-modal {
             position: absolute; top: 30px; right: 20px;
-            width: 36px; height: 36px; background: #fff; border-radius: 50%;
+            width: 40px; height: 40px; background: #fff; border-radius: 50%;
             display: flex; justify-content: center; align-items: center; font-weight: bold;
         }
     </style>
@@ -91,28 +93,28 @@
 <div class="app-container">
     <div id="header-ui">
         <div class="ui-row">
-            <span class="title">拼图 v2.3</span>
-            <span id="level-display" class="lvl-info">第 1/10 关</span>
-            <button onclick="document.getElementById('file-in').click()">本地图片</button>
-            <input type="file" id="file-in" accept="image/*" style="display:none">
-        </div>
-        <div class="ui-row" style="justify-content: center; gap: 15px;">
-            <button id="btn-origin" onclick="toggleModal(true)">显示原图</button>
-            <button id="btn-next" onclick="nextLevel()">下一关</button>
+            <span class="title">拼图 v2.4</span>
+            <span id="lvl-txt" class="lvl-info">加载中...</span>
+            <button onclick="document.getElementById('f-in').click()">选择图片</button>
+            <input type="file" id="f-in" accept="image/*" style="display:none">
         </div>
         <div class="ui-row" style="justify-content: center; gap: 10px;">
-            <select id="diff-sel">
+            <button id="btn-prev" onclick="changeLevel(-1)">上一关</button>
+            <button id="btn-origin" onclick="toggleModal(true)">显示原图</button>
+            <button id="btn-next" onclick="changeLevel(1)">下一关</button>
+        </div>
+        <div class="ui-row" style="justify-content: center; gap: 8px;">
+            <select id="diff-opt" onchange="initGame(true)">
                 <option value="3">3 × 3</option>
                 <option value="5">5 × 5</option>
                 <option value="8">8 × 8</option>
             </select>
-            <button onclick="initGame(true)" style="background:#34c759; color:white; border:none;">开始游戏</button>
-            <button onclick="initGame(true)">重新开始</button>
+            <button onclick="initGame(true)" style="background:#34c759; color:white; border:none;">重新开始</button>
         </div>
     </div>
 
     <div id="game-area">
-        <canvas id="mainCanvas"></canvas>
+        <canvas id="cvs"></canvas>
     </div>
 
     <div id="footer-ui">
@@ -126,65 +128,68 @@
 </div>
 
 <script>
-    // 关卡配置
-    const levels = [
-        'https://picsum.photos/id/10/800/1000',
-        'https://picsum.photos/id/15/800/1000',
-        'https://picsum.photos/id/20/800/1000',
-        'https://picsum.photos/id/25/800/1000',
-        'https://picsum.photos/id/28/800/1000',
-        'https://picsum.photos/id/30/800/1000',
-        'https://picsum.photos/id/42/800/1000',
-        'https://picsum.photos/id/48/800/1000',
-        'https://picsum.photos/id/54/800/1000',
-        'https://picsum.photos/id/60/800/1000'
+    // 1. 50关图库 (避开 Picsum 无效 ID)
+    const imgIds = [
+        10,11,12,13,14,15,16,17,18,19,
+        20,21,22,23,24,25,26,27,28,29,
+        30,31,32,33,34,35,36,37,38,39,
+        40,41,42,43,44,45,46,47,48,49,
+        50,51,52,53,54,55,56,57,58,59
     ];
+    let curIdx = 0;
+    let hasUsedNav = false; // 标记是否点击过切换
 
-    let curLvlIdx = 0;
-    const canvas = document.getElementById('mainCanvas');
-    const ctx = canvas.getContext('2d');
+    const cvs = document.getElementById('cvs');
+    const ctx = cvs.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     
     let img = new Image();
     let pieces = [];
     let size = 3;
-    let lW, lH; // 逻辑宽高
-    let activeP = null;
+    let lW, lH;
+    let dragP = null;
     let isDragging = false;
     let pointer = { x: 0, y: 0 };
     let hoverIdx = -1;
     let confetti = [];
-    let winLock = false;
+    let isWon = false;
+    let autoNextTimer = null;
 
-    // 初始化关卡
+    // 初始化
     window.onload = () => loadLevel(0);
 
     function loadLevel(idx) {
-        curLvlIdx = idx % levels.length;
-        document.getElementById('level-display').innerText = `第 ${curLvlIdx + 1}/10 关`;
+        clearTimeout(autoNextTimer);
+        curIdx = (idx + imgIds.length) % imgIds.length;
+        
+        // 更新 UI 状态
+        document.getElementById('lvl-txt').innerText = `第 ${curIdx + 1}/50 关`;
+        if (curIdx > 0 || hasUsedNav) {
+            document.getElementById('btn-prev').style.display = 'block';
+            hasUsedNav = true;
+        }
+
         img.crossOrigin = "Anonymous";
         img.onload = () => {
             document.getElementById('modal-img').src = img.src;
             document.getElementById('btn-origin').style.visibility = 'visible';
             initGame(true);
         };
-        img.src = levels[curLvlIdx];
+        img.src = `https://picsum.photos/id/${imgIds[curIdx]}/800/1000`;
     }
 
-    function nextLevel() {
-        if (winLock) return;
-        loadLevel(curLvlIdx + 1);
+    function changeLevel(step) {
+        hasUsedNav = true;
+        loadLevel(curIdx + step);
     }
 
-    // 本地上传适配
-    document.getElementById('file-in').onchange = (e) => {
+    document.getElementById('f-in').onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
             img.onload = () => {
-                document.getElementById('modal-img').src = img.src;
-                document.getElementById('level-display').innerText = "自定义关卡";
+                document.getElementById('lvl-txt').innerText = "自定义关卡";
                 initGame(true);
             };
             img.src = ev.target.result;
@@ -192,7 +197,6 @@
         reader.readAsDataURL(file);
     };
 
-    // 视口挤压与高清适配算法
     function syncSize() {
         const area = document.getElementById('game-area');
         const maxLW = area.clientWidth - 10;
@@ -202,22 +206,21 @@
         lW = maxLW; lH = lW / ratio;
         if (lH > maxLH) { lH = maxLH; lW = lH * ratio; }
 
-        canvas.width = lW * dpr;
-        canvas.height = lH * dpr;
-        canvas.style.width = lW + 'px';
-        canvas.style.height = lH + 'px';
-        
+        cvs.width = lW * dpr;
+        cvs.height = lH * dpr;
+        cvs.style.width = lW + 'px';
+        cvs.style.height = lH + 'px';
         ctx.resetTransform();
         ctx.scale(dpr, dpr);
-        ctx.imageSmoothingQuality = 'high';
     }
 
     function initGame(shuffle = true) {
         if (!img.src) return;
-        winLock = false;
+        isWon = false;
+        clearTimeout(autoNextTimer);
         document.getElementById('success-msg').classList.remove('show');
         confetti = [];
-        size = parseInt(document.getElementById('diff-sel').value);
+        size = parseInt(document.getElementById('diff-opt').value);
         syncSize();
 
         pieces = [];
@@ -234,7 +237,7 @@
             } while (checkWin());
         }
         refreshStatus();
-        renderLoop();
+        render();
     }
 
     function checkWin() { return pieces.every(p => p.curr === p.orig); }
@@ -245,33 +248,36 @@
             if (p.curr === p.orig) p.locked = true;
             else { p.locked = false; win = false; }
         });
-        if (win && pieces.length > 0 && !winLock) {
-            winLock = true;
+        if (win && pieces.length > 0 && !isWon) {
+            isWon = true;
             document.getElementById('success-msg').classList.add('show');
+            document.getElementById('btn-prev').style.display = 'block'; // 完成一关也永久显示上一关
             spawnConfetti();
-            setTimeout(() => { if(winLock) nextLevel(); }, 3000);
+            // 3秒后自动下一关
+            autoNextTimer = setTimeout(() => {
+                if(isWon) changeLevel(1);
+            }, 3500);
         }
     }
 
-    // 交互适配
     function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = cvs.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
         return { x: t.clientX - rect.left, y: t.clientY - rect.top };
     }
 
-    function onStart(e) {
-        if (winLock) return;
+    function start(e) {
+        if (isWon && confetti.length === 0) return; 
         const p = getPos(e);
         const cw = lW / size, ch = lH / size;
         const idx = Math.floor(p.y / ch) * size + Math.floor(p.x / cw);
         const target = pieces.find(item => item.curr === idx);
         if (target && !target.locked) {
-            activeP = target; isDragging = true; pointer = p;
+            dragP = target; isDragging = true; pointer = p;
         }
     }
 
-    function onMove(e) {
+    function move(e) {
         if (!isDragging) return;
         pointer = getPos(e);
         const cw = lW / size, ch = lH / size;
@@ -279,38 +285,33 @@
         hoverIdx = (col >= 0 && col < size && row >= 0 && row < size) ? row * size + col : -1;
     }
 
-    function onEnd() {
+    function end() {
         if (!isDragging) return;
         if (hoverIdx !== -1) {
             const tp = pieces.find(p => p.curr === hoverIdx);
-            if (tp && !tp.locked && tp !== activeP) {
-                const tmp = activeP.curr;
-                activeP.curr = tp.curr;
+            if (tp && !tp.locked && tp !== dragP) {
+                const tmp = dragP.curr;
+                dragP.curr = tp.curr;
                 tp.curr = tmp;
             }
         }
-        activeP = null; isDragging = false; hoverIdx = -1;
+        dragP = null; isDragging = false; hoverIdx = -1;
         refreshStatus();
     }
 
-    canvas.addEventListener('mousedown', onStart);
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onStart(e); }, {passive:false});
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); onMove(e); }, {passive:false});
-    window.addEventListener('mouseup', onEnd);
-    window.addEventListener('touchend', onEnd);
+    cvs.addEventListener('mousedown', start);
+    cvs.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); }, {passive:false});
+    window.addEventListener('mousemove', move);
+    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); move(e); }, {passive:false});
+    window.addEventListener('mouseup', end);
+    window.addEventListener('touchend', end);
 
-    // 智能渲染与边界合并 (v2.3 核心)
-    function renderLoop() {
+    function render() {
         ctx.clearRect(0, 0, lW, lH);
         const cw = lW / size, ch = lH / size;
 
-        // 1. 绘制底层静态碎片
-        pieces.forEach(p => {
-            if (p !== activeP) drawPiece(p, cw, ch);
-        });
+        pieces.forEach(p => { if (p !== dragP) drawPiece(p, cw, ch); });
 
-        // 2. 目标高亮
         if (isDragging && hoverIdx !== -1) {
             const hp = pieces.find(p => p.curr === hoverIdx);
             if (hp && !hp.locked) {
@@ -320,18 +321,16 @@
             }
         }
 
-        // 3. 悬浮块绘制
-        if (activeP) {
+        if (dragP) {
             ctx.save();
-            ctx.shadowBlur = 15; ctx.shadowColor = "rgba(0,0,0,0.4)";
-            ctx.globalAlpha = 0.85;
+            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0,0,0,0.4)";
+            ctx.globalAlpha = 0.8;
             const x = pointer.x - cw/2, y = pointer.y - ch/2;
-            drawImgFrag(activeP, x, y, cw, ch);
+            drawFrag(dragP, x, y, cw, ch);
             ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.strokeRect(x,y,cw,ch);
             ctx.restore();
         }
 
-        // 4. 五彩纸屑
         if (confetti.length > 0) {
             confetti.forEach((c, i) => {
                 c.y += c.v; c.x += Math.sin(c.a) * 2;
@@ -340,38 +339,33 @@
                 if (c.y > lH) confetti.splice(i, 1);
             });
         }
-        requestAnimationFrame(renderLoop);
+        requestAnimationFrame(render);
     }
 
     function drawPiece(p, cw, ch) {
-        const x = (p.curr % size) * cw;
-        const y = Math.floor(p.curr / size) * ch;
-        drawImgFrag(p, x, y, cw, ch);
+        const x = (p.curr % size) * cw, y = Math.floor(p.curr / size) * ch;
+        drawFrag(p, x, y, cw, ch);
 
         if (p.locked) {
             ctx.save();
             ctx.strokeStyle = "lime"; ctx.lineWidth = 3;
             ctx.beginPath();
             const r = Math.floor(p.curr / size), c = p.curr % size;
-            
-            // 邻域检测合并算法
             const check = (idx) => {
-                const neighbor = pieces.find(item => item.curr === idx);
-                return neighbor && neighbor.locked;
+                const n = pieces.find(item => item.curr === idx);
+                return n && n.locked;
             };
-
             if (r === 0 || !check(p.curr - size)) { ctx.moveTo(x, y); ctx.lineTo(x + cw, y); }
             if (r === size - 1 || !check(p.curr + size)) { ctx.moveTo(x, y + ch); ctx.lineTo(x + cw, y + ch); }
             if (c === 0 || !check(p.curr - 1)) { ctx.moveTo(x, y); ctx.lineTo(x, y + ch); }
             if (c === size - 1 || !check(p.curr + 1)) { ctx.moveTo(x + cw, y); ctx.lineTo(x + cw, y + ch); }
-            
             ctx.stroke(); ctx.restore();
         } else {
-            ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; ctx.strokeRect(x, y, cw, ch);
+            ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1; ctx.strokeRect(x, y, cw, ch);
         }
     }
 
-    function drawImgFrag(p, x, y, cw, ch) {
+    function drawFrag(p, x, y, cw, ch) {
         const sw = img.width / size, sh = img.height / size;
         const sx = (p.orig % size) * sw, sy = Math.floor(p.orig / size) * sh;
         ctx.drawImage(img, sx, sy, sw, sh, x, y, cw, ch);
@@ -388,8 +382,8 @@
         }
     }
 
-    function toggleModal(val) { document.getElementById('modal').style.display = val ? 'flex' : 'none'; }
-    window.addEventListener('resize', () => { if(img.src) { syncSize(); } });
+    function toggleModal(v) { document.getElementById('modal').style.display = v ? 'flex' : 'none'; }
+    window.addEventListener('resize', () => { if(img.src) syncSize(); });
 </script>
 </body>
 </html>
