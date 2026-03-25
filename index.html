@@ -1,526 +1,790 @@
 <!DOCTYPE html>
+ 
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-    <title>拼图 v2.9 - 交互全优化版</title>
-    <style>
-        :root {
-            --bg: #0c0e14; --surface: #161922; --border: #2c3044;
-            --text: #eae8e4; --text2: #8b8a94; 
-            --accent: #007bff; /* 蓝色高亮 */
-            --accent-text: #000; /* 蓝色按钮对应黑色文字 */
-            --green: #43a047; --yellow: #fdd835; --radius: 8px;
-        }
-        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-        html, body { 
-            width:100%; height:100dvh; overflow:hidden; background:var(--bg); color:var(--text);
-            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-            touch-action:none; overscroll-behavior:none;
-        }
-
-        #app { display:flex; flex-direction:column; height:100dvh; width:100%; max-width:540px; margin:0 auto; padding:8px; }
-
-        /* 三行 UI 约束 */
-        .row { display:flex; align-items:center; justify-content:space-between; gap:6px; height:40px; flex-shrink:0; margin-bottom:4px; }
-        .logo { font-size:16px; font-weight:800; background:linear-gradient(135deg,#fff,#888); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        .lvl-indicator { font-size:14px; font-weight:600; color:var(--text2); }
-
-        .btn { 
-            padding:6px 12px; border-radius:var(--radius); border:none; font-size:13px; font-weight:600;
-            cursor:pointer; transition:all 0.1s active; background:var(--border); color:var(--text);
-            display:flex; align-items:center; justify-content:center; white-space:nowrap;
-        }
-        .btn:active { transform:scale(0.92); filter:brightness(1.2); }
-        .btn.blue { background:var(--accent); color:var(--accent-text); }
-        .btn.hidden { display:none; }
-        .btn.gone { visibility:hidden; pointer-events:none; }
-
-        select { 
-            background:var(--surface); color:var(--text); border:1px solid var(--border); 
-            padding:5px; border-radius:var(--radius); outline:none; font-size:13px;
-        }
-
-        /* 画布区域 */
-        #canvasWrap { 
-            flex:1; position:relative; display:flex; align-items:center; justify-content:center; 
-            overflow:hidden; margin:10px 0; background:rgba(0,0,0,0.2); border-radius:12px;
-        }
-        canvas { display:block; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); }
-
-        #successMsg {
-            position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
-            font-size:28px; font-weight:900; color:var(--green); pointer-events:none;
-            opacity:0; transition: 0.3s; text-shadow:0 0 20px rgba(67,160,71,0.6);
-        }
-        #successMsg.show { opacity:1; animation: bump 0.5s ease-out; }
-
-        /* 遮罩层 */
-        #ov { position:fixed; inset:0; background:rgba(0,0,0,0.9); display:none; z-index:100; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
-        #ov.show { display:flex; }
-        #ov img { max-width:100%; max-height:80%; border-radius:8px; border:2px solid #555; }
-        #ovX { margin-top:20px; width:50px; height:50px; border-radius:50%; background:#fff; color:#000; border:none; font-size:24px; font-weight:bold; }
-
-        @keyframes bump { 0%{transform:translateX(-50%) scale(0.8);} 100%{transform:translateX(-50%) scale(1);} }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>拼图 v2.8</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+ --bg:#0c0e14;--surface:#161922;--surface2:#1e2230;--border:#2c3044;
+ --text:#eae8e4;--text2:#8b8a94;--accent:#42a5f5;--accent2:#1e88e5;
+ --green:#43a047;--yellow:#fdd835;--red:#ef5350;--radius:7px;
+}
+html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);color:var(--text);
+ font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans
+SC','Helvetica Neue',sans-serif;
+ touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+ 
+#app{display:flex;flex-direction:column;height:100dvh;width:100%;max-width:540px;margin:0
+auto;padding:5px 8px 2px}
+ 
+/* === TOP ROWS === */
+.row{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:2px
+0;flex-shrink:0}
+.row.r2{justify-content:center;gap:6px}
+.row.r3{justify-content:center;gap:6px}
+.logo{font-size:14px;font-weight:800;letter-spacing:.5px;background:linear-gradient(135deg,#42a5f5,#ab47bc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.lvl{font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap}
+ 
+.btn{
+padding:5px 11px;border:1px solid
+var(--border);border-radius:var(--radius);
+background:var(--surface2);color:var(--text);font-size:12px;font-weight:500;
+cursor:pointer;transition:all
+.12s;white-space:nowrap;outline:none;-webkit-appearance:none;
+line-height:1.4;
+}
+.btn:active{transform:scale(.94);filter:brightness(.85)}
+ 
+/* 修改部分：将背景改为蓝色，文字改为黑色
+*/
+.btn.blue{background:#007bff;color:#000;border-color:#007bff;font-weight:700}
+.btn.blue:active{background:#0056b3}
+ 
+.btn.gone{display:none}
+ 
+select.sel{
+padding:5px 8px;border:1px solid
+var(--border);border-radius:var(--radius);
+background:var(--surface2);color:var(--text);font-size:12px;outline:none;
+-webkit-appearance:none;appearance:none;cursor:pointer;min-width:62px;text-align:center;
+}
+ 
+/* === CANVAS AREA === */
+#canvasWrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;min-height:0}
+canvas#gc{display:block;touch-action:none}
+#successMsg{
+position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+font-size:22px;font-weight:900;color:var(--green);
+text-shadow:0 0 14px
+rgba(67,160,71,.5);opacity:0;transition:opacity .35s;
+pointer-events:none;white-space:nowrap;letter-spacing:1px;
+}
+#successMsg.show{opacity:1}
+#loadTip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text2);font-size:13px;display:none}
+#loadTip.show{display:block}
+ 
+/* === OVERLAY === */
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;z-index:100;align-items:center;justify-content:center}
+#ov.show{display:flex}
+#ov
+img{max-width:92vw;max-height:86vh;border-radius:10px;box-shadow:0 8px 40px
+rgba(0,0,0,.6)}
+#ovX{position:absolute;top:max(env(safe-area-inset-top),14px);right:18px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+ 
+/* === CONFETTI === */
+.confetti-cv{position:fixed;inset:0;pointer-events:none;z-index:200}
+ 
+@media(max-width:360px){.btn{padding:4px
+8px;font-size:11px}.logo{font-size:12px}}
+</style>
+ 
 </head>
 <body>
-
 <div id="app">
-    <div class="row">
-        <span class="logo">拼图 v2.9</span>
-        <span class="lvl-indicator" id="lvlTxt">第 1 关</span>
-        <button class="btn" id="bUpload">选择图片</button>
-    </div>
-    <div class="row" style="justify-content:center; gap:10px;">
-        <button class="btn hidden" id="bPrev">上一关</button>
-        <button class="btn blue hidden" id="bShow">显示原图</button>
-        <button class="btn blue" id="bNext">下一关</button>
-    </div>
-    <div class="row">
-        <select id="sDiff">
-            <option value="3">3×3</option>
-            <option value="4" selected>4×4</option>
-            <option value="5">5×5</option>
-            <option value="6">6×6</option>
-            <option value="8">8×8</option>
-        </select>
-        <button class="btn blue" id="bStart" style="flex:1; margin-left:10px;">开始 / 重新开始</button>
-    </div>
-
-    <div id="canvasWrap">
-        <canvas id="gc"></canvas>
-        <div id="successMsg">🎉 拼图成功！</div>
-    </div>
+ <div class="row r1">
+   <span class="logo">拼图 v2.8</span>
+   <span class="lvl" id="lvlTxt">第 1 关</span>
+   <button class="btn" id="bUpload">选择图片</button>
+ </div>
+ <div class="row r2">
+   <button class="btn gone" id="bPrev">上一关</button>
+   <button class="btn blue gone" id="bShow">显示原图</button>
+   <button class="btn blue" id="bNext">下一关</button>
+ </div>
+ <div class="row r3">
+   <select class="sel" id="sDiff">
+     <option value="3">3×3</option>
+     <option value="4" selected>4×4</option>
+     <option value="5">5×5</option>
+     <option value="6">6×6</option>
+     <option value="7">7×7</option>
+     <option value="8">8×8</option>
+   </select>
+   <button class="btn blue" id="bStart">开始</button>
+ </div>
+ <div id="canvasWrap">
+   <canvas id="gc"></canvas>
+   <div id="successMsg">🎉 拼图成功！</div>
+   <div id="loadTip" class="show">加载中...</div>
+  </div>
 </div>
-
-<div id="ov"><img id="ovImg" src=""><button id="ovX">✕</button></div>
-<input type="file" id="fIn" accept="image/*" style="display:none">
-
+ 
+<div id="ov"><img
+id="ovImg" src=""><button id="ovX">✕</button></div>
+<input type="file"
+id="fIn" accept="image/*"
+style="display:none">
+ 
 <script>
-/**
- * 拼图 v2.9 - 核心架构
- * 高级架构师：Gemini
- */
+(()=>{
 'use strict';
+ 
+/* ===== VALID PICSUM IDS (skip known 404s)
+===== */
+const PIDS=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+ 21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+ 41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
+ 64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,
+ 84,85,86,87,88,89,90,91,92,96,97,98,99,100];
+const
+LEVELS=PIDS.slice(0,50).map(id=>`https://picsum.photos/id/${id}/800/1000`);
 
-const $ = s => document.getElementById(s);
-const LEVELS = [
-    "https://cdn4.winhlb.com/2026/03/25/69c364c01918d.jpeg",
-    ...Array.from({length: 49}, (_, i) => `https://picsum.photos/id/${[10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50][i % 41]}/800/1000`)
-];
-
-const State = {
-    level: 0,
-    gridN: 4,
-    pieces: [],
-    img: null,
-    isCustom: false,
-    solved: false,
-    prevUnlocked: false,
-    
-    // 渲染缓冲区
-    dpr: window.devicePixelRatio || 1,
-    cw: 0, ch: 0, W: 0, H: 0,
-    
-    // 拖拽系统
-    dragGroup: [],
-    dragAnchor: null,
-    dragX: 0, dragY: 0,
-    offX: 0, offY: 0,
-    
-    // 预加载队列
-    cache: {},
-    isAutoTransitioning: false
+// 修改第一关图片为指定链接，其余关卡保持不变
+LEVELS[0] = "https://cdn4.winhlb.com/2026/03/25/69c364c01918d.jpeg";
+ 
+/* ===== DOM ===== */
+const $=s=>document.getElementById(s);
+const gc=$('gc'), ctx=gc.getContext('2d');
+const wrap=$('canvasWrap');
+const
+bPrev=$('bPrev'),bNext=$('bNext'),bStart=$('bStart'),bUpload=$('bUpload');
+const
+bShow=$('bShow'),sDiff=$('sDiff'),lvlTxt=$('lvlTxt');
+const
+ov=$('ov'),ovImg=$('ovImg'),ovX=$('ovX');
+const
+loadTip=$('loadTip'),successEl=$('successMsg'),fIn=$('fIn');
+ 
+/* ===== STATE ===== */
+const S={
+ level:0,          // current
+built-in level index
+ gridN:4,
+ pieces:[],
+ img:null,         // currently
+displayed image
+ customImg:null,   // user-uploaded
+image (null = use built-in)
+ isCustom:false,   // whether currently
+showing custom image
+ solved:false,
+ prevShown:false,  // "上一关"
+permanently visible once true
+ 
+  //
+drag
+ drag:null,        // the piece
+being dragged (anchor of group)
+ dragGroup:[],     // all pieces in
+the drag group
+ dragOX:0,dragOY:0,// offset from piece top-left to pointer
+ dragX:0,dragY:0,  // current
+pointer-derived top-left for anchor
+ 
+  //
+layout
+ cw:0,ch:0,W:0,H:0,dpr:1,
+ 
+  //
+timers
+ autoTimer:null,
+ 
+  //
+preload
+ imgCache:{},
+ preloadQ:[],
+ preloading:false
 };
-
-const gc = $('gc'), ctx = gc.getContext('2d');
-
-// --- 核心逻辑：三级预加载系统 ---
-async function loadImage(url) {
-    if (State.cache[url]) return State.cache[url];
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => { State.cache[url] = img; resolve(img); };
-        img.onerror = reject;
-        img.src = url;
-    });
+ 
+/* ===== IMAGE LOADING ===== */
+function loadImg(src){
+ return new Promise((ok,no)=>{
+   if(S.imgCache[src]){ok(S.imgCache[src]);return}
+   const im=new Image();im.crossOrigin='anonymous';
+   im.onload=()=>{S.imgCache[src]=im;ok(im)};
+   im.onerror=()=>no(new Error('fail'));
+   im.src=src;
+  });
 }
-
-async function preloadNext() {
-    // 串行预加载接下来的2关
-    for(let i=1; i<=2; i++) {
-        const nextIdx = (State.level + i) % LEVELS.length;
-        const url = LEVELS[nextIdx];
-        if(!State.cache[url]) {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.src = url; 
-            img.onload = () => { State.cache[url] = img; };
-        }
+ 
+function doPreload(){
+ if(S.preloading||!S.preloadQ.length) return;
+ S.preloading=true;
+ const src=S.preloadQ.shift();
+ if(S.imgCache[src]){S.preloading=false;doPreload();return}
+ const im=new Image();im.crossOrigin='anonymous';
+ im.onload=()=>{S.imgCache[src]=im;S.preloading=false;doPreload()};
+ im.onerror=()=>{S.preloading=false;doPreload()};
+ im.src=src;
+}
+ 
+function schedulePreload(){
+ S.preloadQ=[];
+ for(let i=1;i<=2;i++){
+   const idx=(S.level+i)%LEVELS.length;
+   const u=LEVELS[idx];
+   if(!S.imgCache[u]) S.preloadQ.push(u);
+  }
+ setTimeout(()=>doPreload(),800);
+}
+ 
+/* ===== PIECES ===== */
+function makePieces(n){
+ const arr=[];
+ for(let r=0;r<n;r++) for(let c=0;c<n;c++)
+arr.push({oR:r,oC:c,cR:r,cC:c,locked:false});
+ 
+  //
+Fisher-Yates on positions
+ const pos=arr.map(p=>({r:p.cR,c:p.cC}));
+ for(let i=pos.length-1;i>0;i--){const
+j=Math.random()*(i+1)|0;[pos[i],pos[j]]=[pos[j],pos[i]]}
+ arr.forEach((p,i)=>{p.cR=pos[i].r;p.cC=pos[i].c});
+ 
+  //
+lock correct ones
+ arr.forEach(p=>{if(p.cR===p.oR&&p.cC===p.oC) p.locked=true});
+ 
+  //
+if all correct (rare), swap first two unlocked
+ if(arr.every(p=>p.locked)){
+   arr[0].cR=arr[1].oR;arr[0].cC=arr[1].oC;arr[0].locked=false;
+   arr[1].cR=arr[0].oR;arr[1].cC=arr[0].oC;arr[1].locked=false;
+  }
+ return arr;
+}
+ 
+function pieceAt(r,c){return
+S.pieces.find(p=>p.cR===r&&p.cC===c)}
+ 
+/* ===== GROUP DETECTION (BFS) ===== */
+function getGroup(piece){
+ if(!piece||piece.locked) return [piece];
+ const n=S.gridN;
+ const visited=new Set();
+ const q=[piece], group=[];
+ const key=p=>`${p.cR},${p.cC}`;
+ visited.add(key(piece));
+ 
+ while(q.length){
+   const cur=q.shift();
+   group.push(cur);
+   for(const [dr,dc] of [[0,1],[0,-1],[1,0],[-1,0]]){
+     const nr=cur.cR+dr, nc=cur.cC+dc;
+     if(nr<0||nr>=n||nc<0||nc>=n) continue;
+     const nb=pieceAt(nr,nc);
+     if(!nb||nb.locked) continue;
+     if(visited.has(key(nb))) continue;
+     // relative correctness check
+     if((nb.oR-cur.oR)===dr && (nb.oC-cur.oC)===dc){
+       visited.add(key(nb));
+       q.push(nb);
+     }
     }
+  }
+ return group;
 }
-
-// --- 核心逻辑：碎片与组合系统 ---
-function createPieces() {
-    const n = State.gridN;
-    const arr = [];
-    for(let r=0; r<n; r++) {
-        for(let c=0; c<n; c++) {
-            arr.push({ oR: r, oC: c, cR: r, cC: c, locked: false });
-        }
+ 
+/* ===== SIZING ===== */
+function resize(){
+ const dpr=Math.min(window.devicePixelRatio||1,3);
+ S.dpr=dpr;
+ const wW=wrap.clientWidth-4, wH=wrap.clientHeight-4;
+ if(!S.img){gc.width=gc.height=0;return}
+ const asp=S.img.width/S.img.height;
+  let
+cw,ch;
+ if(wW/wH>asp){ch=wH;cw=ch*asp}else{cw=wW;ch=cw/asp}
+ cw=Math.floor(cw);ch=Math.floor(ch);
+  //
+reserve space for success text
+ const maxH=wH-34;
+ if(ch>maxH){ch=maxH;cw=Math.floor(ch*asp)}
+ S.W=cw;S.H=ch;
+ gc.style.width=cw+'px';gc.style.height=ch+'px';
+ gc.width=Math.round(cw*dpr);gc.height=Math.round(ch*dpr);
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ S.cw=cw/S.gridN;S.ch=ch/S.gridN;
+}
+ 
+/* ===== RENDER ===== */
+function render(){
+ if(!S.img) return;
+ const {gridN:n,cw,ch,W,H,pieces}=S;
+ ctx.clearRect(0,0,W,H);
+ 
+ if(S.solved){
+   ctx.drawImage(S.img,0,0,W,H);
+   return;
+  }
+ 
+  //
+build group map for non-locked pieces
+ const gMap=new Map(); // piece -> group array
+ const visited=new Set();
+ pieces.forEach(p=>{
+   if(p.locked||visited.has(p)) return;
+   const g=getGroup(p);
+   if(g.length>1) g.forEach(m=>{gMap.set(m,g);visited.add(m)});
+  });
+ 
+  //
+dragged set
+ const dragSet=new Set(S.dragGroup);
+ 
+  //
+sort: dragged pieces last (top layer)
+ const
+sorted=[...pieces].sort((a,b)=>(dragSet.has(a)?1:0)-(dragSet.has(b)?1:0));
+ 
+  //
+draw pieces
+ sorted.forEach(p=>{
+   let dx=p.cC*cw, dy=p.cR*ch;
+   // if dragging and part of drag group, offset
+   if(dragSet.has(p)&&S.drag){
+     const anchor=S.drag;
+     dx=S.dragX+(p.cC-anchor.cC)*cw;
+     dy=S.dragY+(p.cR-anchor.cR)*ch;
     }
-    
-    // 随机打乱：确保不会出现已完成状态
-    do {
-        const pos = arr.map(p => ({r: p.cR, c: p.cC}));
-        for (let i = pos.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [pos[i], pos[j]] = [pos[j], pos[i]];
-        }
-        arr.forEach((p, i) => { p.cR = pos[i].r; p.cC = pos[i].c; });
-        // 初始锁定检查
-        arr.forEach(p => { if(p.cR === p.oR && p.cC === p.oC) p.locked = true; });
-    } while (arr.every(p => p.locked));
-    
-    State.pieces = arr;
-}
-
-function getGroup(piece) {
-    if (piece.locked) return [piece];
-    const group = [];
-    const queue = [piece];
-    const visited = new Set([piece]);
-    
-    while(queue.length > 0) {
-        const curr = queue.shift();
-        group.push(curr);
-        
-        // 检查上下左右邻居是否属于同一“相对正确”组合
-        const neighbors = [
-            {dr:-1, dc:0}, {dr:1, dc:0}, {dr:0, dc:-1}, {dr:0, dc:1}
-        ];
-        
-        for(const move of neighbors) {
-            const nr = curr.cR + move.dr;
-            const nc = curr.cC + move.dc;
-            const target = State.pieces.find(p => p.cR === nr && p.cC === nc);
-            
-            if (target && !target.locked && !visited.has(target)) {
-                // 核心判定：相对位置是否与原始位置一致
-                if (target.oR - curr.oR === move.dr && target.oC - curr.oC === move.dc) {
-                    visited.add(target);
-                    queue.push(target);
-                }
-            }
-        }
+   // source rect
+   const sx=p.oC*(S.img.width/n), sy=p.oR*(S.img.height/n);
+   const sw=S.img.width/n, sh=S.img.height/n;
+   ctx.save();
+   ctx.beginPath();ctx.rect(dx,dy,cw,ch);ctx.clip();
+   ctx.drawImage(S.img,sx,sy,sw,sh,dx,dy,cw,ch);
+   ctx.restore();
+  });
+ 
+  //
+draw borders
+ sorted.forEach(p=>{
+   let dx=p.cC*cw, dy=p.cR*ch;
+   if(dragSet.has(p)&&S.drag){
+     dx=S.dragX+(p.cC-S.drag.cC)*cw;
+     dy=S.dragY+(p.cR-S.drag.cR)*ch;
     }
-    return group;
-}
-
-// --- 核心逻辑：原子化交换与边界守卫 ---
-function atomicSwap(group, targetR, targetC) {
-    const anchor = State.dragAnchor;
-    const dr = targetR - anchor.cR;
-    const dc = targetC - anchor.cC;
-
-    // 1. 计算组合的新坐标
-    const newPositions = group.map(p => ({
-        piece: p,
-        nR: p.cR + dr,
-        nC: p.cC + dc
-    }));
-
-    // 2. 边界检查与锁定冲突检查 (碰撞守卫)
-    for (const pos of newPositions) {
-        if (pos.nR < 0 || pos.nR >= State.gridN || pos.nC < 0 || pos.nC >= State.gridN) return false;
-        const obstacle = State.pieces.find(p => p.cR === pos.nR && p.cC === pos.nC);
-        if (obstacle && obstacle.locked && !group.includes(obstacle)) return false;
+ 
+   const edge=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
+ 
+   if(p.locked){
+     // green with merge
+     ctx.strokeStyle='#43a047';ctx.lineWidth=2.5;
+     const t=pieceAt(p.cR-1,p.cC), b=pieceAt(p.cR+1,p.cC);
+     const l=pieceAt(p.cR,p.cC-1), ri=pieceAt(p.cR,p.cC+1);
+     if(!t||!t.locked) edge(dx,dy,dx+cw,dy);
+     if(!b||!b.locked) edge(dx,dy+ch,dx+cw,dy+ch);
+     if(!l||!l.locked) edge(dx,dy,dx,dy+ch);
+     if(!ri||!ri.locked) edge(dx+cw,dy,dx+cw,dy+ch);
     }
-
-    // 3. 执行原子交换
-    const displacedPieces = [];
-    const targetCoords = new Set(newPositions.map(pos => `${pos.nR},${pos.nC}`));
-    const vacatedCoords = group.map(p => ({r: p.cR, c: p.cC}));
-
-    // 记录被挤占的非锁定碎片
-    newPositions.forEach(pos => {
-        const p = State.pieces.find(x => x.cR === pos.nR && x.cC === pos.nC && !group.includes(x));
-        if (p) displacedPieces.push(p);
-    });
-
-    // 更新组合位置
-    newPositions.forEach(pos => {
-        pos.piece.cR = pos.nR;
-        pos.piece.cC = pos.nC;
-    });
-
-    // 将被挤占的碎片填入腾出的空位
-    displacedPieces.forEach((p, i) => {
-        p.cR = vacatedCoords[i].r;
-        p.cC = vacatedCoords[i].c;
-    });
-
-    // 4. 锁定校验
-    State.pieces.forEach(p => {
-        if (!p.locked && p.cR === p.oR && p.cC === p.oC) p.locked = true;
-    });
-
-    integrityCheck();
-    return true;
-}
-
-function integrityCheck() {
-    // 扫描重复坐标，强制修正
-    const seen = new Set();
-    State.pieces.forEach(p => {
-        const key = `${p.cR},${p.cC}`;
-        if (seen.has(key)) {
-            for(let r=0; r<State.gridN; r++) {
-                for(let c=0; c<State.gridN; c++) {
-                    if (!State.pieces.some(x => x.cR === r && x.cC === c)) {
-                        p.cR = r; p.cC = c; return;
-                    }
-                }
-            }
-        }
-        seen.add(key);
-    });
-}
-
-// --- 渲染引擎：高清与智能边框 ---
-function resize() {
-    const wrap = $('canvasWrap');
-    const dpr = State.dpr;
-    const maxW = wrap.clientWidth - 10, maxH = wrap.clientHeight - 40;
-    const img = State.img;
-    const ratio = img.width / img.height;
-    
-    let w = maxW, h = w / ratio;
-    if (h > maxH) { h = maxH; w = h * ratio; }
-
-    State.W = w; State.H = h;
-    gc.style.width = w + 'px'; gc.style.height = h + 'px';
-    gc.width = w * dpr; gc.height = h * dpr;
-    ctx.scale(dpr, dpr);
-    
-    State.cw = w / State.gridN; State.ch = h / State.gridN;
-}
-
-function render() {
-    if (!State.img) return;
-    ctx.clearRect(0, 0, State.W, State.H);
-
-    // 1. 绘制阴影指示器（落点预期）
-    if (State.dragAnchor) {
-        const tR = Math.round(State.dragY / State.ch);
-        const tC = Math.round(State.dragX / State.cw);
-        ctx.fillStyle = "rgba(0, 123, 255, 0.2)";
-        State.dragGroup.forEach(p => {
-            const nr = tR + (p.cR - State.dragAnchor.cR);
-            const nc = tC + (p.cC - State.dragAnchor.cC);
-            if (nr>=0 && nr<State.gridN && nc>=0 && nc<State.gridN) {
-                ctx.fillRect(nc * State.cw, nr * State.ch, State.cw, State.ch);
-            }
-        });
+else if(gMap.has(p)){
+     // yellow with merge within group
+     const g=gMap.get(p);
+     ctx.strokeStyle='#fdd835';ctx.lineWidth=2;
+     const inG=(r,c)=>g.some(x=>x.cR===r&&x.cC===c);
+     if(!inG(p.cR-1,p.cC)) edge(dx,dy,dx+cw,dy);
+     if(!inG(p.cR+1,p.cC)) edge(dx,dy+ch,dx+cw,dy+ch);
+     if(!inG(p.cR,p.cC-1)) edge(dx,dy,dx,dy+ch);
+     if(!inG(p.cR,p.cC+1)) edge(dx+cw,dy,dx+cw,dy+ch);
     }
-
-    // 2. 排序渲染（拖拽组置顶）
-    const sortedPieces = [...State.pieces].sort((a, b) => {
-        const aIn = State.dragGroup.includes(a);
-        const bIn = State.dragGroup.includes(b);
-        return aIn - bIn;
-    });
-
-    sortedPieces.forEach(p => {
-        let x = p.cC * State.cw, y = p.cR * State.ch;
-        if (State.dragGroup.includes(p)) {
-            x = State.dragX + (p.cC - State.dragAnchor.cC) * State.cw;
-            y = State.dragY + (p.cR - State.dragAnchor.cR) * State.ch;
-            ctx.shadowBlur = 15; ctx.shadowColor = "rgba(0,0,0,0.5)";
-        } else {
-            ctx.shadowBlur = 0;
-        }
-
-        const sw = State.img.width / State.gridN, sh = State.img.height / State.gridN;
-        ctx.drawImage(State.img, p.oC * sw, p.oR * sh, sw, sh, x, y, State.cw, State.ch);
-        
-        // 智能边框绘制
-        drawSmartBorder(p, x, y);
-    });
-}
-
-function drawSmartBorder(p, x, y) {
-    const isGroup = !p.locked && getGroup(p).length > 1;
-    ctx.beginPath();
-    ctx.lineWidth = p.locked ? 3 : 1;
-    ctx.strokeStyle = p.locked ? varToHex('--green') : (isGroup ? varToHex('--yellow') : "rgba(255,255,255,0.3)");
-    
-    // 锁定状态下的内边框消除逻辑
-    if (p.locked) {
-        const n = State.gridN;
-        const check = (dr, dc) => {
-            const neighbor = State.pieces.find(x => x.cR === p.cR + dr && x.cC === p.cC + dc);
-            return neighbor && neighbor.locked && (neighbor.oR - p.oR === dr) && (neighbor.oC - p.oC === dc);
-        };
-        if (!check(-1, 0)) { ctx.moveTo(x,y); ctx.lineTo(x+State.cw, y); }
-        if (!check(1, 0)) { ctx.moveTo(x,y+State.ch); ctx.lineTo(x+State.cw, y+State.ch); }
-        if (!check(0, -1)) { ctx.moveTo(x,y); ctx.lineTo(x, y+State.ch); }
-        if (!check(0, 1)) { ctx.moveTo(x+State.cw,y); ctx.lineTo(x+State.cw, y+State.ch); }
-    } else {
-        ctx.rect(x, y, State.cw, State.ch);
+else {
+     ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=1;
+     ctx.strokeRect(dx+.5,dy+.5,cw-1,ch-1);
     }
-    ctx.stroke();
+  });
+ 
+  //
+highlight target shadow positions for drag group
+ if(S.drag&&S.dragGroup.length){
+   const anchor=S.drag;
+   const tR=Math.round(S.dragY/ch), tC=Math.round(S.dragX/cw);
+   S.dragGroup.forEach(p=>{
+     const nr=tR+(p.cR-anchor.cR), nc=tC+(p.cC-anchor.cC);
+     if(nr>=0&&nr<n&&nc>=0&&nc<n){
+       ctx.fillStyle='rgba(66,165,245,.18)';
+       ctx.fillRect(nc*cw,nr*ch,cw,ch);
+       ctx.strokeStyle='rgba(66,165,245,.55)';ctx.lineWidth=1.5;
+       ctx.strokeRect(nc*cw,nr*ch,cw,ch);
+     }
+   });
+   // shadow on dragged pieces
+   S.dragGroup.forEach(p=>{
+     const px=S.dragX+(p.cC-anchor.cC)*cw;
+     const py=S.dragY+(p.cR-anchor.cR)*ch;
+     ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=14;ctx.shadowOffsetY=5;
+     ctx.fillStyle='rgba(0,0,0,.005)';ctx.fillRect(px,py,cw,ch);ctx.restore();
+   });
+  }
 }
-
-function varToHex(v) {
-    return v === '--green' ? '#43a047' : '#fdd835';
-}
-
-// --- 游戏流程管理 ---
-async function startLevel(idx, isCustom = false) {
-    State.level = idx;
-    State.isCustom = isCustom;
-    State.solved = false;
-    State.isAutoTransitioning = false;
-    $('successMsg').classList.remove('show');
-    $('lvlTxt').textContent = isCustom ? "自定义关卡" : `第 ${idx + 1} 关`;
-    
-    if (State.prevUnlocked) $('bPrev').classList.remove('hidden');
-
-    try {
-        const url = isCustom ? State.customUrl : LEVELS[idx % LEVELS.length];
-        State.img = await loadImage(url);
-        $('bShow').classList.remove('hidden');
-        resize();
-        createPieces();
-        render();
-        if (!isCustom) setTimeout(preloadNext, 500);
-    } catch (e) {
-        alert("图片加载失败，请检查网络");
+ 
+/* ===== INTEGRITY CHECK ===== */
+function integrityCheck(){
+ const n=S.gridN;
+ const occ=new Map();
+  //
+first pass: detect duplicates
+ S.pieces.forEach(p=>{
+   const k=`${p.cR},${p.cC}`;
+   if(!occ.has(k)) occ.set(k,[p]);
+   else occ.get(k).push(p);
+  });
+  //
+fix duplicates
+ const used=new Set();
+ S.pieces.forEach(p=>used.add(`${p.cR},${p.cC}`));
+ occ.forEach((arr,k)=>{
+   if(arr.length<=1) return;
+   // keep first, relocate rest
+   for(let i=1;i<arr.length;i++){
+     const p=arr[i];
+     // find nearest free cell
+     let best=null,bestD=Infinity;
+     for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+       const kk=`${r},${c}`;
+       const cnt=S.pieces.filter(x=>x.cR===r&&x.cC===c).length;
+       if(cnt===0){
+         const d=Math.abs(r-p.cR)+Math.abs(c-p.cC);
+         if(d<bestD){bestD=d;best={r,c}}
+       }
+     }
+     if(best){p.cR=best.r;p.cC=best.c}
     }
+  });
 }
-
-function checkWin() {
-    if (State.pieces.every(p => p.locked)) {
-        State.solved = true;
-        State.isAutoTransitioning = true;
-        $('successMsg').classList.add('show');
-        fireConfetti();
-        render();
-        setTimeout(() => {
-            if (State.isAutoTransitioning) goNext();
-        }, 3200);
+ 
+/* ===== INTERACTION ===== */
+function getXY(e){
+ const t=e.touches?e.touches[0]||e.changedTouches[0]:e;
+ const rect=gc.getBoundingClientRect();
+ return{x:t.clientX-rect.left,y:t.clientY-rect.top};
+}
+ 
+function onStart(e){
+ e.preventDefault();
+ if(S.solved) return;
+ const {x,y}=getXY(e);
+ const c=Math.floor(x/S.cw), r=Math.floor(y/S.ch);
+ if(r<0||r>=S.gridN||c<0||c>=S.gridN) return;
+ const p=pieceAt(r,c);
+ if(!p||p.locked) return;
+ 
+ const group=getGroup(p);
+ S.drag=p;
+ S.dragGroup=group;
+  //
+offset: pointer relative to anchor's grid top-left
+ S.dragOX=x-p.cC*S.cw;
+ S.dragOY=y-p.cR*S.ch;
+ S.dragX=x-S.dragOX;
+ S.dragY=y-S.dragOY;
+ render();
+}
+ 
+function onMove(e){
+ e.preventDefault();
+ if(!S.drag) return;
+ const {x,y}=getXY(e);
+ S.dragX=x-S.dragOX;
+ S.dragY=y-S.dragOY;
+ render();
+}
+ 
+function onEnd(e){
+ e.preventDefault();
+ if(!S.drag) return;
+ 
+ const {cw,ch,gridN:n}=S;
+ const anchor=S.drag;
+ const group=S.dragGroup;
+ 
+  //
+target cell for anchor
+  let
+tR=Math.round(S.dragY/ch), tC=Math.round(S.dragX/cw);
+ 
+  //
+compute deltas of group members relative to anchor
+ const deltas=group.map(p=>({p,dr:p.cR-anchor.cR,dc:p.cC-anchor.cC}));
+ 
+  //
+clamp so entire group stays in bounds
+ const minDR=Math.min(...deltas.map(d=>d.dr));
+ const maxDR=Math.max(...deltas.map(d=>d.dr));
+ const minDC=Math.min(...deltas.map(d=>d.dc));
+ const maxDC=Math.max(...deltas.map(d=>d.dc));
+ tR=Math.max(-minDR,Math.min(n-1-maxDR,tR));
+ tC=Math.max(-minDC,Math.min(n-1-maxDC,tC));
+ 
+  //
+if no movement, cancel
+ if(tR===anchor.cR&&tC===anchor.cC){
+   S.drag=null;S.dragGroup=[];render();return;
+  }
+ 
+  //
+new positions for group
+ const newPos=deltas.map(d=>({p:d.p,nR:tR+d.dr,nC:tC+d.dc}));
+ 
+  //
+check if any target position has a locked piece (not in group)
+ const groupSet=new Set(group);
+ const hasLockedConflict=newPos.some(({nR,nC})=>{
+   const t=pieceAt(nR,nC);
+   return t&&t.locked&&!groupSet.has(t);
+  });
+ if(hasLockedConflict){
+   S.drag=null;S.dragGroup=[];render();return;
+  }
+ 
+  //
+=== ATOMIC SWAP ===
+  //
+1. Record old positions of group
+ const groupOld=group.map(p=>({p,r:p.cR,c:p.cC}));
+ const groupOldSet=new Set(groupOld.map(o=>`${o.r},${o.c}`));
+ 
+  //
+2. Find displaced pieces (in target area, not in group, not locked)
+ const displaced=[];
+ newPos.forEach(({nR,nC})=>{
+   const t=pieceAt(nR,nC);
+   if(t&&!groupSet.has(t)&&!t.locked){
+     if(!displaced.includes(t)) displaced.push(t);
     }
-}
-
-function goNext() {
-    State.prevUnlocked = true;
-    if (State.isCustom) {
-        startLevel((State.level + 1) % LEVELS.length, false);
-    } else {
-        startLevel((State.level + 1) % LEVELS.length, false);
+  });
+ 
+  //
+3. Build swap map
+  //
+Group pieces -> new positions
+  //
+Displaced pieces -> vacated positions from group
+ const posMap=new Map(); // piece -> {r,c}
+ 
+ newPos.forEach(({p,nR,nC})=>posMap.set(p,{r:nR,c:nC}));
+ 
+  //
+vacated slots that are NOT also target slots
+ const targetSlotSet=new Set(newPos.map(({nR,nC})=>`${nR},${nC}`));
+ const vacated=groupOld.filter(o=>!targetSlotSet.has(`${o.r},${o.c}`)).map(o=>({r:o.r,c:o.c}));
+ 
+  //
+Assign displaced pieces to vacated slots
+ displaced.forEach((dp,i)=>{
+   if(i<vacated.length){
+     posMap.set(dp,{r:vacated[i].r,c:vacated[i].c});
+   }else{
+     // find any free cell
+     const allUsed=new Set();
+     S.pieces.forEach(p=>{
+       if(posMap.has(p)) allUsed.add(`${posMap.get(p).r},${posMap.get(p).c}`);
+       else if(p!==dp&&!displaced.includes(p))
+allUsed.add(`${p.cR},${p.cC}`);
+     });
+     // also add already-assigned displaced
+     for(let rr=0;rr<n;rr++) for(let cc=0;cc<n;cc++){
+       if(!allUsed.has(`${rr},${cc}`)){posMap.set(dp,{r:rr,c:cc});rr=n;break}
+     }
     }
+  });
+ 
+  //
+4. Apply all at once
+ posMap.forEach((pos,p)=>{p.cR=pos.r;p.cC=pos.c});
+ 
+  //
+5. Check locks
+ S.pieces.forEach(p=>{
+   if(!p.locked&&p.cR===p.oR&&p.cC===p.oC) p.locked=true;
+  });
+ 
+  //
+6. Integrity
+ integrityCheck();
+ 
+ S.drag=null;S.dragGroup=[];
+ render();
+ checkWin();
 }
-
-// --- 交互事件 ---
-function handleStart(e) {
-    if (State.solved) return;
-    const pos = getPos(e);
-    const c = Math.floor(pos.x / State.cw), r = Math.floor(pos.y / State.ch);
-    const p = State.pieces.find(x => x.cR === r && x.cC === c);
-    
-    if (p && !p.locked) {
-        State.dragAnchor = p;
-        State.dragGroup = getGroup(p);
-        State.offX = pos.x - p.cC * State.cw;
-        State.offY = pos.y - p.cR * State.ch;
-        State.dragX = pos.x - State.offX;
-        State.dragY = pos.y - State.offY;
+ 
+/* ===== WIN ===== */
+function checkWin(){
+ if(S.pieces.every(p=>p.locked)){
+   S.solved=true;
+   successEl.classList.add('show');
+   render();
+   fireConfetti();
+   S.autoTimer=setTimeout(()=>{
+     successEl.classList.remove('show');
+     goNext();
+   },3200);
+  }
+}
+ 
+/* ===== CONFETTI ===== */
+function fireConfetti(){
+ const cv=document.createElement('canvas');
+ cv.className='confetti-cv';
+ document.body.appendChild(cv);
+ const x2=cv.getContext('2d');
+ cv.width=window.innerWidth;cv.height=window.innerHeight;
+  const
+P=[];
+ const
+cols=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6eb4','#a855f7','#f97316','#42a5f5'];
+ for(let i=0;i<160;i++){
+   P.push({
+     x:cv.width*.5+(Math.random()-.5)*cv.width*.6,
+     y:cv.height*(-.05-Math.random()*.4),
+     w:Math.random()*9+3,h:Math.random()*6+2,
+     c:cols[Math.random()*cols.length|0],
+     vx:(Math.random()-.5)*5,vy:Math.random()*3+1.5,
+     rot:Math.random()*360,rv:(Math.random()-.5)*12,
+     life:1
+   });
+  }
+  let
+last=performance.now();
+  (function
+tick(t){
+   const dt=Math.min((t-last)/1000,.05);last=t;
+   x2.clearRect(0,0,cv.width,cv.height);
+   let alive=false;
+   P.forEach(p=>{
+     p.x+=p.vx;p.y+=p.vy;p.vy+=4*dt;p.rot+=p.rv;p.life-=dt*.32;
+     if(p.life<=0)return;
+     alive=true;
+     x2.save();x2.translate(p.x,p.y);x2.rotate(p.rot*Math.PI/180);
+     x2.globalAlpha=Math.max(0,p.life);
+     x2.fillStyle=p.c;x2.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+     x2.restore();
+   });
+   if(alive) requestAnimationFrame(tick);
+   else cv.remove();
+ })(last);
+}
+ 
+/* ===== GAME FLOW ===== */
+async function
+loadLevel(levelIdx,useCustom){
+ S.solved=false;S.drag=null;S.dragGroup=[];
+ successEl.classList.remove('show');
+ if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+ 
+ S.level=levelIdx;
+ S.isCustom=!!useCustom;
+ 
+ lvlTxt.textContent=useCustom?'自定义关卡':`第
+${levelIdx+1} 关`;
+ 
+ loadTip.textContent='加载中...';
+ loadTip.classList.add('show');
+ bShow.classList.add('gone');
+ 
+ try{
+   if(useCustom&&S.customImg){
+     S.img=S.customImg;
+   }else{
+     S.img=await loadImg(LEVELS[levelIdx%LEVELS.length]);
     }
+   loadTip.classList.remove('show');
+   bShow.classList.remove('gone');
+   S.gridN=parseInt(sDiff.value);
+   S.pieces=makePieces(S.gridN);
+   resize();render();
+    if(!useCustom) schedulePreload();
+ }catch(err){
+   loadTip.textContent='加载失败，重试中...';
+   setTimeout(()=>loadLevel(levelIdx,useCustom),1500);
+  }
 }
-
-function handleMove(e) {
-    if (!State.dragAnchor) return;
-    const pos = getPos(e);
-    State.dragX = pos.x - State.offX;
-    State.dragY = pos.y - State.offY;
-    render();
+ 
+function goNext(){
+ S.prevShown=true;
+ bPrev.classList.remove('gone');
+  //
+always advance built-in level, even if currently showing custom
+ const nextLvl=S.level+1;
+ S.customImg=null; // clear custom
+ loadLevel(nextLvl,false);
 }
-
-function handleEnd() {
-    if (!State.dragAnchor) return;
-    const tR = Math.round(State.dragY / State.ch);
-    const tC = Math.round(State.dragX / State.cw);
-    
-    atomicSwap(State.dragGroup, tR, tC);
-    
-    State.dragAnchor = null;
-    State.dragGroup = [];
-    render();
-    checkWin();
+ 
+function goPrev(){
+ if(S.level>0){
+   S.customImg=null;
+   loadLevel(S.level-1,false);
+  }
 }
-
-function getPos(e) {
-    const t = e.touches ? e.touches[0] : e;
-    const rect = gc.getBoundingClientRect();
-    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-}
-
-// --- 辅助功能：五彩纸屑 ---
-function fireConfetti() {
-    const canvas = document.createElement('canvas');
-    canvas.style.position = 'fixed'; canvas.style.inset = 0; canvas.style.pointerEvents = 'none'; canvas.style.zIndex = 1000;
-    document.body.appendChild(canvas);
-    const x = canvas.getContext('2d');
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    let particles = Array.from({length: 100}, () => ({
-        x: Math.random() * canvas.width, y: -20,
-        r: Math.random() * 6 + 4, d: Math.random() * canvas.width,
-        color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-        v: Math.random() * 3 + 2
-    }));
-    function draw() {
-        x.clearRect(0,0,canvas.width,canvas.height);
-        particles.forEach(p => {
-            p.y += p.v; x.fillStyle = p.color;
-            x.fillRect(p.x, p.y, p.r, p.r);
-        });
-        if (particles[0].y < canvas.height) requestAnimationFrame(draw);
-        else canvas.remove();
-    }
-    draw();
-}
-
-// --- 初始化与绑定 ---
-window.addEventListener('resize', () => { if(State.img) { resize(); render(); }});
-gc.addEventListener('touchstart', e => { e.preventDefault(); handleStart(e); }, {passive:false});
-gc.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e); }, {passive:false});
-gc.addEventListener('touchend', handleEnd);
-gc.addEventListener('mousedown', handleStart);
-window.addEventListener('mousemove', handleMove);
-window.addEventListener('mouseup', handleEnd);
-
-$('bStart').onclick = () => { State.gridN = parseInt($('sDiff').value); startLevel(State.level, State.isCustom); };
-$('sDiff').onchange = () => { State.gridN = parseInt($('sDiff').value); startLevel(State.level, State.isCustom); };
-$('bNext').onclick = () => { State.isAutoTransitioning = false; goNext(); };
-$('bPrev').onclick = () => { if(State.level > 0) startLevel(State.level - 1); };
-$('bShow').onclick = () => { $('ovImg').src = State.img.src; $('ov').classList.add('show'); };
-$('ovX').onclick = () => $('ov').classList.remove('show');
-$('bUpload').onclick = () => $('fIn').click();
-$('fIn').onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => { State.customUrl = ev.target.result; startLevel(State.level, true); };
-        reader.readAsDataURL(file);
-    }
-};
-
-// 启动首关
-startLevel(0);
+ 
+/* ===== EVENT BINDINGS ===== */
+gc.addEventListener('mousedown',onStart);
+gc.addEventListener('mousemove',onMove);
+gc.addEventListener('mouseup',onEnd);
+gc.addEventListener('mouseleave',e=>{if(S.drag)onEnd(e)});
+gc.addEventListener('touchstart',onStart,{passive:false});
+gc.addEventListener('touchmove',onMove,{passive:false});
+gc.addEventListener('touchend',onEnd,{passive:false});
+gc.addEventListener('touchcancel',onEnd,{passive:false});
+ 
+// block pull-to-refresh / rubber-band
+document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+ 
+bNext.addEventListener('click',()=>{
+ if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+ successEl.classList.remove('show');
+ goNext();
+});
+ 
+bPrev.addEventListener('click',()=>goPrev());
+ 
+bStart.addEventListener('click',()=>{
+ if(!S.img) return;
+ S.gridN=parseInt(sDiff.value);
+ S.pieces=makePieces(S.gridN);
+ S.solved=false;
+ successEl.classList.remove('show');
+ if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+ resize();render();
+});
+ 
+sDiff.addEventListener('change',()=>{
+ if(!S.img) return;
+ S.gridN=parseInt(sDiff.value);
+ S.pieces=makePieces(S.gridN);
+ S.solved=false;
+ successEl.classList.remove('show');
+ if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+ resize();render();
+});
+ 
+bShow.addEventListener('click',()=>{
+ if(!S.img) return;
+ const tc=document.createElement('canvas');
+ tc.width=S.img.width;tc.height=S.img.height;
+ tc.getContext('2d').drawImage(S.img,0,0);
+ ovImg.src=tc.toDataURL();
+ ov.classList.add('show');
+});
+ovX.addEventListener('click',()=>ov.classList.remove('show'));
+ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});
+ 
+bUpload.addEventListener('click',()=>fIn.click());
+fIn.addEventListener('change',e=>{
+ const f=e.target.files[0];if(!f)return;
+ const rd=new FileReader();
+ rd.onload=ev=>{
+   const im=new Image();
+   im.onload=()=>{
+     S.customImg=im;
+     loadLevel(S.level,true);
+   };
+   im.src=ev.target.result;
+  };
+ rd.readAsDataURL(f);
+ fIn.value='';
+});
+ 
+window.addEventListener('resize',()=>{resize();render()});
+ 
+/* ===== INIT ===== */
+loadLevel(0,false);
+ 
+})();
 </script>
-
+ 
 </body>
 </html>
