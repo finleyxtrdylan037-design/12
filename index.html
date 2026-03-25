@@ -32,8 +32,8 @@ canvas#gc{display:block;touch-action:none}
 #loadTip.show{display:block}
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;z-index:100;align-items:center;justify-content:center}
 #ov.show{display:flex}
-#ov img{max-width:92vw;max-height:86vh;border-radius:10px}
-#ovX{position:absolute;top:max(env(safe-area-inset-top),14px);right:18px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+#ov img{max-width:92vw;max-height:86vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+#ovX{position:absolute;top:max(env(safe-area-inset-top),14px);right:18px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .confetti-cv{position:fixed;inset:0;pointer-events:none;z-index:200}
 </style>
 </head>
@@ -70,50 +70,28 @@ canvas#gc{display:block;touch-action:none}
 <script>
 (()=>{
 'use strict';
-/* ===== 关卡设定 ===== */
+/* ===== 关卡设定 (12关) ===== */
 const LEVELS = Array.from({length: 12}, (_, i) => `https://finleyxtrdylan037-design.github.io/12/images/${i + 1}.jpg`);
 
+/* ===== DOM ===== */
 const $=s=>document.getElementById(s);
 const gc=$('gc'), ctx=gc.getContext('2d'), wrap=$('canvasWrap');
 const bPrev=$('bPrev'),bNext=$('bNext'),bStart=$('bStart'),bUpload=$('bUpload'),bShow=$('bShow'),sDiff=$('sDiff'),lvlTxt=$('lvlTxt');
 const ov=$('ov'),ovImg=$('ovImg'),ovX=$('ovX'),loadTip=$('loadTip'),successEl=$('successMsg'),fIn=$('fIn');
 
+/* ===== 状态 ===== */
 const S={
   level:0, gridN:4, pieces:[], img:null, customImg:null, isCustom:false, solved:false,
   drag:null, dragGroup:[], dragOX:0, dragOY:0, dragX:0, dragY:0,
   cw:0, ch:0, W:0, H:0, dpr:1, autoTimer:null, imgCache:{}, preloadQ:[], preloading:false
 };
 
-/* ===== 核心逻辑修改：下一关循环 ===== */
-function goNext(){
-  S.prevShown = true;
-  bPrev.classList.remove('gone');
-  
-  // 如果当前是最后一关（索引11），则回到第一关（索引0）
-  let nextIdx = S.level + 1;
-  if (nextIdx >= LEVELS.length) {
-    nextIdx = 0;
-  }
-  
-  S.customImg = null; 
-  loadLevel(nextIdx, false);
-}
-
-function goPrev(){
-  if(S.level > 0){
-    loadLevel(S.level - 1, false);
-  } else {
-    // 如果在第一关点上一关，可以跳到最后一关（可选）
-    loadLevel(LEVELS.length - 1, false);
-  }
-}
-
-/* ===== 以下为原有的必要拼图代码，保持不变 ===== */
+/* ===== 核心逻辑 ===== */
 function loadImg(src){
   return new Promise((ok,no)=>{
     if(S.imgCache[src]){ok(S.imgCache[src]);return}
-    const im=new Image();im.crossOrigin='anonymous';
-    im.onload=()=>{S.imgCache[src]=im;ok(im)};
+    const im=new Image(); im.crossOrigin='anonymous';
+    im.onload=()=>{S.imgCache[src]=im; ok(im)};
     im.onerror=()=>no(new Error('fail'));
     im.src=src;
   });
@@ -123,13 +101,31 @@ function makePieces(n){
   const arr=[];
   for(let r=0;r<n;r++) for(let c=0;c<n;c++) arr.push({oR:r,oC:c,cR:r,cC:c,locked:false});
   const pos=arr.map(p=>({r:p.cR,c:p.cC}));
-  for(let i=pos.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[pos[i],pos[j]]=[pos[j],pos[i]]}
-  arr.forEach((p,i)=>{p.cR=pos[i].r;p.cC=pos[i].c});
+  for(let i=pos.length-1;i>0;i--){const j=Math.random()*(i+1)|0; [pos[i],pos[j]]=[pos[j],pos[i]]}
+  arr.forEach((p,i)=>{p.cR=pos[i].r; p.cC=pos[i].c});
   arr.forEach(p=>{if(p.cR===p.oR&&p.cC===p.oC) p.locked=true});
+  if(arr.every(p=>p.locked)){ [arr[0].cR,arr[1].cR]=[arr[1].cR,arr[0].cR]; arr[0].locked=arr[1].locked=false; }
   return arr;
 }
 
 function pieceAt(r,c){return S.pieces.find(p=>p.cR===r&&p.cC===c)}
+
+function getGroup(p){
+  if(!p||p.locked) return [p];
+  const n=S.gridN, visited=new Set(), group=[], q=[p], key=x=>`${x.cR},${x.cC}`;
+  visited.add(key(p));
+  while(q.length){
+    const cur=q.shift(); group.push(cur);
+    for(const [dr,dc] of [[0,1],[0,-1],[1,0],[-1,0]]){
+      const nr=cur.cR+dr, nc=cur.cC+dc;
+      if(nr<0||nr>=n||nc<0||nc>=n) continue;
+      const nb=pieceAt(nr,nc);
+      if(!nb||nb.locked||visited.has(key(nb))) continue;
+      if((nb.oR-cur.oR)===dr && (nb.oC-cur.oC)===dc){ visited.add(key(nb)); q.push(nb); }
+    }
+  }
+  return group;
+}
 
 function resize(){
   const dpr=Math.min(window.devicePixelRatio||1,3); S.dpr=dpr;
@@ -138,40 +134,84 @@ function resize(){
   const asp=S.img.width/S.img.height;
   let cw,ch;
   if(wW/wH>asp){ch=wH;cw=ch*asp}else{cw=wW;ch=cw/asp}
-  cw=Math.floor(cw);ch=Math.floor(ch);
+  cw=Math.floor(cw); ch=Math.floor(ch);
   const maxH=wH-34; if(ch>maxH){ch=maxH;cw=Math.floor(ch*asp)}
-  S.W=cw;S.H=ch; gc.style.width=cw+'px';gc.style.height=ch+'px';
-  gc.width=Math.round(cw*dpr);gc.height=Math.round(ch*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0); S.cw=cw/S.gridN;S.ch=ch/S.gridN;
+  S.W=cw; S.H=ch; gc.style.width=cw+'px'; gc.style.height=ch+'px';
+  gc.width=Math.round(cw*dpr); gc.height=Math.round(ch*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0); S.cw=cw/S.gridN; S.ch=ch/S.gridN;
 }
 
 function render(){
   if(!S.img) return;
-  const {gridN:n,cw,ch,W,H,pieces}=S;
-  ctx.clearRect(0,0,W,H);
+  const {gridN:n,cw,ch,W,H,pieces}=S; ctx.clearRect(0,0,W,H);
   if(S.solved){ctx.drawImage(S.img,0,0,W,H);return}
-  pieces.forEach(p=>{
+  const dragSet=new Set(S.dragGroup);
+  const sorted=[...pieces].sort((a,b)=>(dragSet.has(a)?1:0)-(dragSet.has(b)?1:0));
+  sorted.forEach(p=>{
     let dx=p.cC*cw, dy=p.cR*ch;
-    const sx=p.oC*(S.img.width/n), sy=p.oR*(S.img.height/n);
-    const sw=S.img.width/n, sh=S.img.height/n;
-    ctx.save(); ctx.beginPath();ctx.rect(dx,dy,cw,ch);ctx.clip();
+    if(dragSet.has(p)&&S.drag){ dx=S.dragX+(p.cC-S.drag.cC)*cw; dy=S.dragY+(p.cR-S.drag.cR)*ch; }
+    const sx=p.oC*(S.img.width/n), sy=p.oR*(S.img.height/n), sw=S.img.width/n, sh=S.img.height/n;
+    ctx.save(); ctx.beginPath(); ctx.rect(dx,dy,cw,ch); ctx.clip();
     ctx.drawImage(S.img,sx,sy,sw,sh,dx,dy,cw,ch); ctx.restore();
-    ctx.strokeStyle=p.locked?'#43a047':'rgba(255,255,255,0.3)';
-    ctx.lineWidth=p.locked?2:1; ctx.strokeRect(dx,dy,cw,ch);
+    ctx.strokeStyle=p.locked?'#43a047':'rgba(255,255,255,0.3)'; ctx.lineWidth=p.locked?2:1;
+    ctx.strokeRect(dx+.5,dy+.5,cw-1,ch-1);
   });
 }
 
-async function loadLevel(levelIdx,useCustom){
+/* ===== 交互处理 ===== */
+function getXY(e){
+  const t=e.touches?e.touches[0]:e, rect=gc.getBoundingClientRect();
+  return {x:t.clientX-rect.left, y:t.clientY-rect.top};
+}
+function onStart(e){
+  if(S.solved)return; const {x,y}=getXY(e);
+  const c=Math.floor(x/S.cw), r=Math.floor(y/S.ch);
+  const p=pieceAt(r,c); if(!p||p.locked)return;
+  S.drag=p; S.dragGroup=getGroup(p);
+  S.dragOX=x-p.cC*S.cw; S.dragOY=y-p.cR*S.ch;
+  S.dragX=x-S.dragOX; S.dragY=y-S.dragOY;
+}
+function onMove(e){ if(!S.drag)return; e.preventDefault(); const {x,y}=getXY(e); S.dragX=x-S.dragOX; S.dragY=y-S.dragOY; render(); }
+function onEnd(){
+  if(!S.drag)return; const {cw,ch,gridN:n}=S, anchor=S.drag, group=S.dragGroup;
+  let tR=Math.round(S.dragY/ch), tC=Math.round(S.dragX/cw);
+  const deltas=group.map(p=>({p,dr:p.cR-anchor.cR,dc:p.cC-anchor.cC}));
+  const minDR=Math.min(...deltas.map(d=>d.dr)), maxDR=Math.max(...deltas.map(d=>d.dr));
+  const minDC=Math.min(...deltas.map(d=>d.dc)), maxDC=Math.max(...deltas.map(d=>d.dc));
+  tR=Math.max(-minDR,Math.min(n-1-maxDR,tR)); tC=Math.max(-minDC,Math.min(n-1-maxDC,tC));
+  const newPos=deltas.map(d=>({p:d.p,nR:tR+d.dr,nC:tC+d.dc}));
+  const groupSet=new Set(group);
+  if(!newPos.some(({nR,nC})=>{const t=pieceAt(nR,nC); return t&&t.locked&&!groupSet.has(t)})){
+    const posMap=new Map(); newPos.forEach(({p,nR,nC})=>posMap.set(p,{r:nR,c:nC}));
+    const targetSlotSet=new Set(newPos.map(({nR,nC})=>`${nR},${nC}`));
+    const vacated=group.map(p=>({r:p.cR,c:p.cC})).filter(o=>!targetSlotSet.has(`${o.r},${o.c}`));
+    const displaced=S.pieces.filter(p=>!groupSet.has(p)&&!p.locked&&targetSlotSet.has(`${p.cR},${p.cC}`));
+    displaced.forEach((dp,i)=>{ if(i<vacated.length) posMap.set(dp,{r:vacated[i].r,c:vacated[i].c}); });
+    posMap.forEach((pos,p)=>{p.cR=pos.r; p.cC=pos.c});
+    S.pieces.forEach(p=>{if(!p.locked&&p.cR===p.oR&&p.cC===p.oC) p.locked=true});
+  }
+  S.drag=null; S.dragGroup=[]; render(); checkWin();
+}
+
+/* ===== 游戏流程 (包含循环逻辑) ===== */
+async function loadLevel(idx,useCustom){
   S.solved=false; successEl.classList.remove('show');
-  S.level=levelIdx; S.isCustom=!!useCustom;
-  lvlTxt.textContent=useCustom?'自定义关卡':`第 ${levelIdx+1} 关`;
+  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+  S.level=idx; S.isCustom=!!useCustom;
+  lvlTxt.textContent=useCustom?'自定义关卡':`第 ${idx+1} 关`;
   loadTip.classList.add('show');
   try{
-    S.img = useCustom?S.customImg:await loadImg(LEVELS[levelIdx]);
+    S.img = useCustom?S.customImg:await loadImg(LEVELS[idx]);
     loadTip.classList.remove('show'); bShow.classList.remove('gone');
     S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
     resize(); render();
   }catch(e){ loadTip.textContent='加载失败'; }
+}
+
+function goNext(){
+  S.prevShown=true; bPrev.classList.remove('gone');
+  let nextIdx = (S.level + 1) % LEVELS.length; // 核心：超过12关(索引11)后回到0
+  loadLevel(nextIdx, false);
 }
 
 function checkWin(){
@@ -181,14 +221,18 @@ function checkWin(){
   }
 }
 
-// 交互事件省略（同前，确保逻辑闭环）...
-gc.onmousedown = (e) => { /* 拖拽逻辑保持原样 */ }; 
-// 为了简洁，其余事件绑定略，您可以直接在原代码基础上替换 goNext 函数。
-
-bNext.onclick = ()=>goNext();
-bPrev.onclick = ()=>goPrev();
-bStart.onclick = ()=>loadLevel(S.level, false);
-window.onresize = ()=>{resize();render()};
+/* ===== 绑定事件 ===== */
+gc.onmousedown=onStart; window.onmousemove=onMove; window.onmouseup=onEnd;
+gc.ontouchstart=e=>{onStart(e); e.preventDefault();}; gc.ontouchmove=onMove; gc.ontouchend=onEnd;
+bNext.onclick=()=>goNext();
+bPrev.onclick=()=>{ if(S.level>0) loadLevel(S.level-1,false); else loadLevel(LEVELS.length-1,false); };
+bStart.onclick=()=>loadLevel(S.level,false);
+sDiff.onchange=()=>loadLevel(S.level,false);
+bShow.onclick=()=>{ if(!S.img)return; const tc=document.createElement('canvas'); tc.width=S.img.width; tc.height=S.img.height; tc.getContext('2d').drawImage(S.img,0,0); ovImg.src=tc.toDataURL(); ov.classList.add('show'); };
+ovX.onclick=()=>ov.classList.remove('show');
+bUpload.onclick=()=>fIn.click();
+fIn.onchange=e=>{ const f=e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=ev=>{const im=new Image(); im.onload=()=>{S.customImg=im; loadLevel(S.level,true)}; im.src=ev.target.result}; rd.readAsDataURL(f); fIn.value=''; };
+window.onresize=()=>{resize();render()};
 
 loadLevel(0,false);
 })();
