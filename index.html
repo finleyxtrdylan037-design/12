@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>拼图 v2.8 - 单关版</title>
+<title>拼图 v2.8</title>
 <style>
 /* 样式部分保持不变 */
-*,::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#0c0e14;--surface:#161922;--surface2:#1e2230;--border:#2c3044;
   --text:#eae8e4;--text2:#8b8a94;--accent:#42a5f5;--accent2:#1e88e5;
@@ -89,18 +89,9 @@ pointer-events:none;white-space:nowrap;letter-spacing:1px;
 <script>
 (()=>{
 'use strict';
-/* ===== VALID PICSUM IDS ===== */
-const PIDS=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
-  21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
-  41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
-  64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,
-  84,85,86,87,88,89,90,91,92,96,97,98,99,100];
 
-/**
- * 修改点：将 LEVELS 修改为只有一个指定关卡
- * 图片地址指向用户提供的 URL
- */
-const LEVELS = ["https://pngcdn.cn/thumbnails/6c632e5f537d8a3c00fc70d06bc559d8.png"];
+/* ===== 修改部分：设置6个关卡，指向你的图片地址 ===== */
+const LEVELS = [1, 2, 3, 4, 5, 6].map(id => `https://finleyxtrdylan037-design.github.io/12/images/${id}.jpg`);
 
 /* ===== DOM ===== */
 const $=s=>document.getElementById(s);
@@ -127,18 +118,12 @@ const S={
   dragX:0,dragY:0,
   cw:0,ch:0,W:0,H:0,dpr:1,
   autoTimer:null,
-  imgCache:{}, // 存储已下载的 Image 对象
-  preloadQ:[], // 预加载队列
-  preloading:false // 是否正在执行预加载
+  imgCache:{},
+  preloadQ:[],
+  preloading:false
 };
 
-/* ===== IMAGE LOADING & PRELOAD (已加注释) ===== */
-
-/**
- * loadImg: 加载单个图片并返回 Promise
- * @param {string} src - 图片的 URL 地址
- * 功能：首先检查 S.imgCache 缓存，若有则直接返回；否则创建 Image 对象进行异步加载，并存入缓存。
- */
+/* ===== 核心逻辑保持不变 ===== */
 function loadImg(src){
   return new Promise((ok,no)=>{
     if(S.imgCache[src]){ok(S.imgCache[src]);return}
@@ -148,12 +133,6 @@ function loadImg(src){
     im.src=src;
   });
 }
-
-/**
- * doPreload: 执行预加载队列中的任务
- * 功能：从 S.preloadQ 队列中提取 URL，递归加载图片。
- * 这样在玩当前关卡时，下一关的图片已经在后台下载完成，切换时无需等待。
- */
 function doPreload(){
   if(S.preloading||!S.preloadQ.length) return;
   S.preloading=true;
@@ -164,13 +143,8 @@ function doPreload(){
   im.onerror=()=>{S.preloading=false;doPreload()};
   im.src=src;
 }
-
-/**
- * schedulePreload: 规划需要预加载的关卡
- * 功能：计算当前关卡之后的 2 个关卡索引，将其对应的图片 URL 放入预加载队列，并延迟触发 doPreload。
- */
 function schedulePreload(){
-  // 在当前单关卡逻辑下，此函数虽然运行但不会有新的不同 URL 存入缓存
+  S.preloadQ=[];
   for(let i=1;i<=2;i++){
     const idx=(S.level+i)%LEVELS.length;
     const u=LEVELS[idx];
@@ -178,13 +152,11 @@ function schedulePreload(){
   }
   setTimeout(()=>doPreload(),800);
 }
-
-/* ===== 后续逻辑（保持不变） ===== */
 function makePieces(n){
   const arr=[];
   for(let r=0;r<n;r++) for(let c=0;c<n;c++) arr.push({oR:r,oC:c,cR:r,cC:c,locked:false});
   const pos=arr.map(p=>({r:p.cR,c:p.cC}));
-  for(let i=pos.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pos[i],pos[j]]=[pos[j],pos[i]]}
+  for(let i=pos.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[pos[i],pos[j]]=[pos[j],pos[i]]}
   arr.forEach((p,i)=>{p.cR=pos[i].r;p.cC=pos[i].c});
   arr.forEach(p=>{if(p.cR===p.oR&&p.cC===p.oC) p.locked=true});
   if(arr.every(p=>p.locked)){
@@ -196,18 +168,21 @@ function makePieces(n){
 function pieceAt(r,c){return S.pieces.find(p=>p.cR===r&&p.cC===c)}
 function getGroup(piece){
   if(!piece||piece.locked) return [piece];
-  const n=S.gridN, group=[], q=[piece], visited=new Set();
+  const n=S.gridN, visited=new Set(), group=[], q=[piece];
   const key=p=>`${p.cR},${p.cC}`;
   visited.add(key(piece));
   while(q.length){
-    const cur=q.shift();group.push(cur);
+    const cur=q.shift();
+    group.push(cur);
     for(const [dr,dc] of [[0,1],[0,-1],[1,0],[-1,0]]){
       const nr=cur.cR+dr, nc=cur.cC+dc;
       if(nr<0||nr>=n||nc<0||nc>=n) continue;
       const nb=pieceAt(nr,nc);
-      if(!nb||nb.locked||visited.has(key(nb))) continue;
+      if(!nb||nb.locked) continue;
+      if(visited.has(key(nb))) continue;
       if((nb.oR-cur.oR)===dr && (nb.oC-cur.oC)===dc){
-        visited.add(key(nb));q.push(nb);
+        visited.add(key(nb));
+        q.push(nb);
       }
     }
   }
@@ -252,8 +227,10 @@ function render(){
     }
     const sx=p.oC*(S.img.width/n), sy=p.oR*(S.img.height/n);
     const sw=S.img.width/n, sh=S.img.height/n;
-    ctx.save();ctx.beginPath();ctx.rect(dx,dy,cw,ch);ctx.clip();
-    ctx.drawImage(S.img,sx,sy,sw,sh,dx,dy,cw,ch);ctx.restore();
+    ctx.save();
+    ctx.beginPath();ctx.rect(dx,dy,cw,ch);ctx.clip();
+    ctx.drawImage(S.img,sx,sy,sw,sh,dx,dy,cw,ch);
+    ctx.restore();
   });
   sorted.forEach(p=>{
     let dx=p.cC*cw, dy=p.cR*ch;
@@ -270,7 +247,8 @@ function render(){
       if(!l||!l.locked) edge(dx,dy,dx,dy+ch);
       if(!ri||!ri.locked) edge(dx+cw,dy,dx+cw,dy+ch);
     } else if(gMap.has(p)){
-      const g=gMap.get(p);ctx.strokeStyle='#fdd835';ctx.lineWidth=2;
+      const g=gMap.get(p);
+      ctx.strokeStyle='#fdd835';ctx.lineWidth=2;
       const inG=(r,c)=>g.some(x=>x.cR===r&&x.cC===c);
       if(!inG(p.cR-1,p.cC)) edge(dx,dy,dx+cw,dy);
       if(!inG(p.cR+1,p.cC)) edge(dx,dy+ch,dx+cw,dy+ch);
@@ -282,16 +260,20 @@ function render(){
     }
   });
   if(S.drag&&S.dragGroup.length){
-    const anchor=S.drag, tR=Math.round(S.dragY/ch), tC=Math.round(S.dragX/cw);
+    const anchor=S.drag;
+    const tR=Math.round(S.dragY/ch), tC=Math.round(S.dragX/cw);
     S.dragGroup.forEach(p=>{
       const nr=tR+(p.cR-anchor.cR), nc=tC+(p.cC-anchor.cC);
       if(nr>=0&&nr<n&&nc>=0&&nc<n){
-        ctx.fillStyle='rgba(66,165,245,.18)';ctx.fillRect(nc*cw,nr*ch,cw,ch);
-        ctx.strokeStyle='rgba(66,165,245,.55)';ctx.lineWidth=1.5;ctx.strokeRect(nc*cw,nr*ch,cw,ch);
+        ctx.fillStyle='rgba(66,165,245,.18)';
+        ctx.fillRect(nc*cw,nr*ch,cw,ch);
+        ctx.strokeStyle='rgba(66,165,245,.55)';ctx.lineWidth=1.5;
+        ctx.strokeRect(nc*cw,nr*ch,cw,ch);
       }
     });
     S.dragGroup.forEach(p=>{
-      const px=S.dragX+(p.cC-anchor.cC)*cw, py=S.dragY+(p.cR-anchor.cR)*ch;
+      const px=S.dragX+(p.cC-anchor.cC)*cw;
+      const py=S.dragY+(p.cR-anchor.cR)*ch;
       ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=14;ctx.shadowOffsetY=5;
       ctx.fillStyle='rgba(0,0,0,.005)';ctx.fillRect(px,py,cw,ch);ctx.restore();
     });
@@ -299,13 +281,17 @@ function render(){
 }
 function integrityCheck(){
   const n=S.gridN, occ=new Map();
-  S.pieces.forEach(p=>{const k=`${p.cR},${p.cC}`;if(!occ.has(k))occ.set(k,[p]);else occ.get(k).push(p)});
+  S.pieces.forEach(p=>{
+    const k=`${p.cR},${p.cC}`;
+    if(!occ.has(k)) occ.set(k,[p]); else occ.get(k).push(p);
+  });
   occ.forEach((arr,k)=>{
     if(arr.length<=1) return;
     for(let i=1;i<arr.length;i++){
-      const p=arr[i];let best=null,bestD=Infinity;
+      const p=arr[i]; let best=null,bestD=Infinity;
       for(let r=0;r<n;r++) for(let c=0;c<n;c++){
-        if(S.pieces.filter(x=>x.cR===r&&x.cC===c).length===0){
+        const cnt=S.pieces.filter(x=>x.cR===r&&x.cC===c).length;
+        if(cnt===0){
           const d=Math.abs(r-p.cR)+Math.abs(c-p.cC);
           if(d<bestD){bestD=d;best={r,c}}
         }
@@ -320,33 +306,47 @@ function getXY(e){
   return{x:t.clientX-rect.left,y:t.clientY-rect.top};
 }
 function onStart(e){
-  e.preventDefault();if(S.solved) return;
-  const {x,y}=getXY(e), c=Math.floor(x/S.cw), r=Math.floor(y/S.ch);
+  e.preventDefault();
+  if(S.solved) return;
+  const {x,y}=getXY(e);
+  const c=Math.floor(x/S.cw), r=Math.floor(y/S.ch);
   if(r<0||r>=S.gridN||c<0||c>=S.gridN) return;
-  const p=pieceAt(r,c);if(!p||p.locked) return;
-  S.drag=p;S.dragGroup=getGroup(p);
-  S.dragOX=x-p.cC*S.cw;S.dragOY=y-p.cR*S.ch;
-  S.dragX=x-S.dragOX;S.dragY=y-S.dragOY;render();
+  const p=pieceAt(r,c);
+  if(!p||p.locked) return;
+  S.drag=p; S.dragGroup=getGroup(p);
+  S.dragOX=x-p.cC*S.cw; S.dragOY=y-p.cR*S.ch;
+  S.dragX=x-S.dragOX; S.dragY=y-S.dragOY;
+  render();
 }
 function onMove(e){
-  e.preventDefault();if(!S.drag) return;
-  const {x,y}=getXY(e);S.dragX=x-S.dragOX;S.dragY=y-S.dragOY;render();
+  e.preventDefault();
+  if(!S.drag) return;
+  const {x,y}=getXY(e);
+  S.dragX=x-S.dragOX; S.dragY=y-S.dragOY;
+  render();
 }
 function onEnd(e){
-  e.preventDefault();if(!S.drag) return;
+  e.preventDefault();
+  if(!S.drag) return;
   const {cw,ch,gridN:n}=S, anchor=S.drag, group=S.dragGroup;
   let tR=Math.round(S.dragY/ch), tC=Math.round(S.dragX/cw);
   const deltas=group.map(p=>({p,dr:p.cR-anchor.cR,dc:p.cC-anchor.cC}));
   const minDR=Math.min(...deltas.map(d=>d.dr)), maxDR=Math.max(...deltas.map(d=>d.dr));
   const minDC=Math.min(...deltas.map(d=>d.dc)), maxDC=Math.max(...deltas.map(d=>d.dc));
-  tR=Math.max(-minDR,Math.min(n-1-maxDR,tR));tC=Math.max(-minDC,Math.min(n-1-maxDC,tC));
-  if(tR===anchor.cR&&tC===anchor.cC){S.drag=null;S.dragGroup=[];render();return}
-  const newPos=deltas.map(d=>({p:d.p,nR:tR+d.dr,nC:tC+d.dc})), groupSet=new Set(group);
-  if(newPos.some(({nR,nC})=>{const t=pieceAt(nR,nC);return t&&t.locked&&!groupSet.has(t)})){
+  tR=Math.max(-minDR,Math.min(n-1-maxDR,tR));
+  tC=Math.max(-minDC,Math.min(n-1-maxDC,tC));
+  if(tR===anchor.cR&&tC===anchor.cC){ S.drag=null;S.dragGroup=[];render();return; }
+  const newPos=deltas.map(d=>({p:d.p,nR:tR+d.dr,nC:tC+d.dc}));
+  const groupSet=new Set(group);
+  if(newPos.some(({nR,nC})=>{const t=pieceAt(nR,nC); return t&&t.locked&&!groupSet.has(t)})){
     S.drag=null;S.dragGroup=[];render();return;
   }
-  const groupOld=group.map(p=>({p,r:p.cR,c:p.cC})), displaced=[];
-  newPos.forEach(({nR,nC})=>{const t=pieceAt(nR,nC);if(t&&!groupSet.has(t)&&!t.locked) displaced.push(t)});
+  const groupOld=group.map(p=>({p,r:p.cR,c:p.cC}));
+  const displaced=[];
+  newPos.forEach(({nR,nC})=>{
+    const t=pieceAt(nR,nC);
+    if(t&&!groupSet.has(t)&&!t.locked) displaced.push(t);
+  });
   const posMap=new Map();
   newPos.forEach(({p,nR,nC})=>posMap.set(p,{r:nR,c:nC}));
   const targetSlotSet=new Set(newPos.map(({nR,nC})=>`${nR},${nC}`));
@@ -354,65 +354,111 @@ function onEnd(e){
   displaced.forEach((dp,i)=>{
     if(i<vacated.length) posMap.set(dp,{r:vacated[i].r,c:vacated[i].c});
     else {
-      const allUsed=new Set();S.pieces.forEach(p=>{if(posMap.has(p)) allUsed.add(`${posMap.get(p).r},${posMap.get(p).c}`);else if(p!==dp&&!displaced.includes(p)) allUsed.add(`${p.cR},${p.cC}`)});
-      for(let rr=0;rr<n;rr++) for(let cc=0;cc<n;cc++){if(!allUsed.has(`${rr},${cc}`)){posMap.set(dp,{r:rr,c:cc});rr=n;break}}
+      const allUsed=new Set();
+      S.pieces.forEach(p=>{
+        if(posMap.has(p)) allUsed.add(`${posMap.get(p).r},${posMap.get(p).c}`);
+        else if(p!==dp&&!displaced.includes(p)) allUsed.add(`${p.cR},${p.cC}`);
+      });
+      for(let rr=0;rr<n;rr++) for(let cc=0;cc<n;cc++){
+        if(!allUsed.has(`${rr},${cc}`)){posMap.set(dp,{r:rr,c:cc});rr=n;break}
+      }
     }
   });
   posMap.forEach((pos,p)=>{p.cR=pos.r;p.cC=pos.c});
-  S.pieces.forEach(p=>{if(!p.locked&&p.cR===p.oR&&p.cC===p.oC) p.locked=true});
-  integrityCheck();S.drag=null;S.dragGroup=[];render();checkWin();
+  S.pieces.forEach(p=>{ if(!p.locked&&p.cR===p.oR&&p.cC===p.oC) p.locked=true });
+  integrityCheck(); S.drag=null; S.dragGroup=[]; render(); checkWin();
 }
 function checkWin(){
   if(S.pieces.every(p=>p.locked)){
-    S.solved=true;successEl.classList.add('show');render();fireConfetti();
-    S.autoTimer=setTimeout(()=>{successEl.classList.remove('show');goNext()},3200);
+    S.solved=true; successEl.classList.add('show'); render(); fireConfetti();
+    S.autoTimer=setTimeout(()=>{ successEl.classList.remove('show'); goNext(); },3200);
   }
 }
 function fireConfetti(){
-  const cv=document.createElement('canvas');cv.className='confetti-cv';document.body.appendChild(cv);
-  const x2=cv.getContext('2d');cv.width=window.innerWidth;cv.height=window.innerHeight;
+  const cv=document.createElement('canvas'); cv.className='confetti-cv'; document.body.appendChild(cv);
+  const x2=cv.getContext('2d'); cv.width=window.innerWidth; cv.height=window.innerHeight;
   const P=[], cols=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6eb4','#a855f7','#f97316','#42a5f5'];
-  for(let i=0;i<160;i++){P.push({x:cv.width*.5+(Math.random()-.5)*cv.width*.6,y:cv.height*(-.05-Math.random()*.4),w:Math.random()*9+3,h:Math.random()*6+2,c:cols[Math.random()*cols.length|0],vx:(Math.random()-.5)*5,vy:Math.random()*3+1.5,rot:Math.random()*360,rv:(Math.random()-.5)*12,life:1})}
+  for(let i=0;i<160;i++) P.push({x:cv.width*.5+(Math.random()-.5)*cv.width*.6,y:cv.height*(-.05-Math.random()*.4),w:Math.random()*9+3,h:Math.random()*6+2,c:cols[Math.random()*cols.length|0],vx:(Math.random()-.5)*5,vy:Math.random()*3+1.5,rot:Math.random()*360,rv:(Math.random()-.5)*12,life:1});
   let last=performance.now();
   (function tick(t){
-    const dt=Math.min((t-last)/1000,.05);last=t;x2.clearRect(0,0,cv.width,cv.height);let alive=false;
-    P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=40*dt;p.rot+=p.rv;p.life-=dt*0.32;if(p.life<=0)return;alive=true;x2.save();x2.translate(p.x,p.y);x2.rotate(p.rot*Math.PI/180);x2.globalAlpha=Math.max(0,p.life);x2.fillStyle=p.c;x2.fillRect(-p.w/2,-p.h/2,p.w,p.h);x2.restore()});
-    if(alive) requestAnimationFrame(tick);else cv.remove();
+    const dt=Math.min((t-last)/1000,.05); last=t; x2.clearRect(0,0,cv.width,cv.height); let alive=false;
+    P.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=40*dt; p.rot+=p.rv; p.life-=dt*0.32;
+      if(p.life<=0)return; alive=true; x2.save(); x2.translate(p.x,p.y); x2.rotate(p.rot*Math.PI/180); x2.globalAlpha=Math.max(0,p.life); x2.fillStyle=p.c; x2.fillRect(-p.w/2,-p.h/2,p.w,p.h); x2.restore();
+    });
+    if(alive) requestAnimationFrame(tick); else cv.remove();
   })(last);
 }
 async function loadLevel(levelIdx,useCustom){
-  successEl.classList.remove('show');if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
-  S.level=levelIdx;S.isCustom=!!useCustom;
+  S.solved=false; successEl.classList.remove('show');
+  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+  S.level=levelIdx; S.isCustom=!!useCustom;
   lvlTxt.textContent=useCustom?'自定义关卡':`第 ${levelIdx+1} 关`;
-  loadTip.textContent='加载中...';loadTip.classList.add('show');bShow.classList.add('gone');
+  loadTip.textContent='加载中...'; loadTip.classList.add('show'); bShow.classList.add('gone');
   try{
     if(useCustom&&S.customImg) S.img=S.customImg;
-    else S.img=await loadImg(LEVELS[levelIdx%LEVELS.length]);
-    loadTip.classList.remove('show');bShow.classList.remove('gone');
-    S.gridN=parseInt(sDiff.value);S.pieces=makePieces(S.gridN);S.solved=false;
-    resize();render();if(!useCustom) schedulePreload();
-  }catch(err){loadTip.textContent='加载失败，重试中...';setTimeout(()=>loadLevel(levelIdx,useCustom),1500)}
+    else S.img=await loadImg(LEVELS[levelIdx % LEVELS.length]);
+    loadTip.classList.remove('show'); bShow.classList.remove('gone');
+    S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
+    resize(); render(); if(!useCustom) schedulePreload();
+  }catch(err){
+    loadTip.textContent='加载失败，重试中...'; setTimeout(()=>loadLevel(levelIdx,useCustom),1500);
+  }
 }
 function goNext(){
-  S.prevShown=true;bPrev.classList.remove('gone');
-  // 由于现在只有一关，goNext 实际上会循环加载同一张图
-  const nextLvl=S.level+1;S.customImg=null;loadLevel(nextLvl,false);
+  S.prevShown=true; bPrev.classList.remove('gone');
+  const nextLvl=(S.level+1) % LEVELS.length;
+  S.customImg=null; loadLevel(nextLvl,false);
 }
-function goPrev(){if(S.level>0){S.customImg=null;loadLevel(S.level-1,false)}}
-gc.addEventListener('mousedown',onStart);gc.addEventListener('mousemove',onMove);gc.addEventListener('mouseup',onEnd);
+function goPrev(){
+  if(S.level>0){ S.customImg=null; loadLevel(S.level-1,false); }
+}
+
+/* ===== EVENT BINDINGS ===== */
+gc.addEventListener('mousedown',onStart);
+gc.addEventListener('mousemove',onMove);
+gc.addEventListener('mouseup',onEnd);
 gc.addEventListener('mouseleave',e=>{if(S.drag)onEnd(e)});
-gc.addEventListener('touchstart',onStart,{passive:false});gc.addEventListener('touchmove',onMove,{passive:false});
-gc.addEventListener('touchend',onEnd,{passive:false});gc.addEventListener('touchcancel',onEnd,{passive:false});
+gc.addEventListener('touchstart',onStart,{passive:false});
+gc.addEventListener('touchmove',onMove,{passive:false});
+gc.addEventListener('touchend',onEnd,{passive:false});
+gc.addEventListener('touchcancel',onEnd,{passive:false});
 document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
-bNext.addEventListener('click',()=>{if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}successEl.classList.remove('show');goNext()});
+bNext.addEventListener('click',()=>{
+  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+  successEl.classList.remove('show'); goNext();
+});
 bPrev.addEventListener('click',()=>goPrev());
-bStart.addEventListener('click',()=>{if(!S.img) return;S.gridN=parseInt(sDiff.value);S.pieces=makePieces(S.gridN);S.solved=false;successEl.classList.remove('show');if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}resize();render()});
-sDiff.addEventListener('change',()=>{if(!S.img) return;S.gridN=parseInt(sDiff.value);S.pieces=makePieces(S.gridN);S.solved=false;successEl.classList.remove('show');if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}resize();render()});
-bShow.addEventListener('click',()=>{if(!S.img) return;const tc=document.createElement('canvas');tc.width=S.img.width;tc.height=S.img.height;tc.getContext('2d').drawImage(S.img,0,0);ovImg.src=tc.toDataURL();ov.classList.add('show')});
+bStart.addEventListener('click',()=>{
+  if(!S.img) return;
+  S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
+  S.solved=false; successEl.classList.remove('show');
+  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+  resize();render();
+});
+sDiff.addEventListener('change',()=>{
+  if(!S.img) return;
+  S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
+  S.solved=false; successEl.classList.remove('show');
+  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
+  resize();render();
+});
+bShow.addEventListener('click',()=>{
+  if(!S.img) return;
+  const tc=document.createElement('canvas'); tc.width=S.img.width; tc.height=S.img.height;
+  tc.getContext('2d').drawImage(S.img,0,0); ovImg.src=tc.toDataURL(); ov.classList.add('show');
+});
 ovX.addEventListener('click',()=>ov.classList.remove('show'));
 ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});
 bUpload.addEventListener('click',()=>fIn.click());
-fIn.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{const im=new Image();im.onload=()=>{S.customImg=im;loadLevel(S.level,true)};im.src=ev.target.result};rd.readAsDataURL(f);fIn.value=''});
+fIn.addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    const im=new Image(); im.onload=()=>{ S.customImg=im; loadLevel(S.level,true); }; im.src=ev.target.result;
+  };
+  rd.readAsDataURL(f); fIn.value='';
+});
 window.addEventListener('resize',()=>{resize();render()});
 loadLevel(0,false);
 })();
