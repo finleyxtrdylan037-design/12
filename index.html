@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>拼图 v2.8</title>
+<title>拼图 v2.8 - 12关版</title>
 <style>
-/* 样式部分保持不变 */
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+* ,::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#0c0e14;--surface:#161922;--surface2:#1e2230;--border:#2c3044;
   --text:#eae8e4;--text2:#8b8a94;--accent:#42a5f5;--accent2:#1e88e5;
@@ -16,6 +15,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);color:va
   font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Helvetica Neue',sans-serif;
   touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
 #app{display:flex;flex-direction:column;height:100dvh;width:100%;max-width:540px;margin:0 auto;padding:5px 8px 2px}
+/* === TOP ROWS === */
 .row{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:2px 0;flex-shrink:0}
 .row.r2{justify-content:center;gap:6px}
 .row.r3{justify-content:center;gap:6px}
@@ -36,6 +36,7 @@ padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);
 background:var(--surface2);color:var(--text);font-size:12px;outline:none;
 -webkit-appearance:none;appearance:none;cursor:pointer;min-width:62px;text-align:center;
 }
+/* === CANVAS AREA === */
 #canvasWrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;min-height:0}
 canvas#gc{display:block;touch-action:none}
 #successMsg{
@@ -47,10 +48,12 @@ pointer-events:none;white-space:nowrap;letter-spacing:1px;
 #successMsg.show{opacity:1}
 #loadTip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text2);font-size:13px;display:none}
 #loadTip.show{display:block}
+/* === OVERLAY === */
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;z-index:100;align-items:center;justify-content:center}
 #ov.show{display:flex}
 #ov img{max-width:92vw;max-height:86vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
 #ovX{position:absolute;top:max(env(safe-area-inset-top),14px);right:18px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+/* === CONFETTI === */
 .confetti-cv{position:fixed;inset:0;pointer-events:none;z-index:200}
 @media(max-width:360px){.btn{padding:4px 8px;font-size:11px}.logo{font-size:12px}}
 </style>
@@ -89,9 +92,8 @@ pointer-events:none;white-space:nowrap;letter-spacing:1px;
 <script>
 (()=>{
 'use strict';
-
-/* ===== 修改部分：设置6个关卡，指向你的图片地址 ===== */
-const LEVELS = [1, 2, 3, 4, 5, 6].map(id => `https://finleyxtrdylan037-design.github.io/12/images/${id}.jpg`);
+/* ===== 修改部分：12关卡及自定义路径 ===== */
+const LEVELS = Array.from({length: 12}, (_, i) => `https://finleyxtrdylan037-design.github.io/12/images/${i + 1}.jpg`);
 
 /* ===== DOM ===== */
 const $=s=>document.getElementById(s);
@@ -123,7 +125,7 @@ const S={
   preloading:false
 };
 
-/* ===== 核心逻辑保持不变 ===== */
+/* ===== IMAGE LOADING ===== */
 function loadImg(src){
   return new Promise((ok,no)=>{
     if(S.imgCache[src]){ok(S.imgCache[src]);return}
@@ -144,7 +146,7 @@ function doPreload(){
   im.src=src;
 }
 function schedulePreload(){
-  S.preloadQ=[];
+  S.preloadQ = [];
   for(let i=1;i<=2;i++){
     const idx=(S.level+i)%LEVELS.length;
     const u=LEVELS[idx];
@@ -152,6 +154,8 @@ function schedulePreload(){
   }
   setTimeout(()=>doPreload(),800);
 }
+
+/* ===== PIECES ===== */
 function makePieces(n){
   const arr=[];
   for(let r=0;r<n;r++) for(let c=0;c<n;c++) arr.push({oR:r,oC:c,cR:r,cC:c,locked:false});
@@ -160,12 +164,16 @@ function makePieces(n){
   arr.forEach((p,i)=>{p.cR=pos[i].r;p.cC=pos[i].c});
   arr.forEach(p=>{if(p.cR===p.oR&&p.cC===p.oC) p.locked=true});
   if(arr.every(p=>p.locked)){
-    arr[0].cR=arr[1].oR;arr[0].cC=arr[1].oC;arr[0].locked=false;
-    arr[1].cR=arr[0].oR;arr[1].cC=arr[0].oC;arr[1].locked=false;
+    const [p0, p1] = arr;
+    const tempR = p0.cR, tempC = p0.cC;
+    p0.cR = p1.cR; p0.cC = p1.cC; p0.locked = false;
+    p1.cR = tempR; p1.cC = tempC; p1.locked = false;
   }
   return arr;
 }
 function pieceAt(r,c){return S.pieces.find(p=>p.cR===r&&p.cC===c)}
+
+/* ===== GROUP DETECTION ===== */
 function getGroup(piece){
   if(!piece||piece.locked) return [piece];
   const n=S.gridN, visited=new Set(), group=[], q=[piece];
@@ -188,6 +196,8 @@ function getGroup(piece){
   }
   return group;
 }
+
+/* ===== LAYOUT & RENDER ===== */
 function resize(){
   const dpr=Math.min(window.devicePixelRatio||1,3);
   S.dpr=dpr;
@@ -205,6 +215,7 @@ function resize(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   S.cw=cw/S.gridN;S.ch=ch/S.gridN;
 }
+
 function render(){
   if(!S.img) return;
   const {gridN:n,cw,ch,W,H,pieces}=S;
@@ -241,7 +252,8 @@ function render(){
     const edge=(x1,y1,x2,y2)=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
     if(p.locked){
       ctx.strokeStyle='#43a047';ctx.lineWidth=2.5;
-      const t=pieceAt(p.cR-1,p.cC), b=pieceAt(p.cR+1,p.cC), l=pieceAt(p.cR,p.cC-1), ri=pieceAt(p.cR,p.cC+1);
+      const t=pieceAt(p.cR-1,p.cC), b=pieceAt(p.cR+1,p.cC);
+      const l=pieceAt(p.cR,p.cC-1), ri=pieceAt(p.cR,p.cC+1);
       if(!t||!t.locked) edge(dx,dy,dx+cw,dy);
       if(!b||!b.locked) edge(dx,dy+ch,dx+cw,dy+ch);
       if(!l||!l.locked) edge(dx,dy,dx,dy+ch);
@@ -265,22 +277,17 @@ function render(){
     S.dragGroup.forEach(p=>{
       const nr=tR+(p.cR-anchor.cR), nc=tC+(p.cC-anchor.cC);
       if(nr>=0&&nr<n&&nc>=0&&nc<n){
-        ctx.fillStyle='rgba(66,165,245,.18)';
-        ctx.fillRect(nc*cw,nr*ch,cw,ch);
-        ctx.strokeStyle='rgba(66,165,245,.55)';ctx.lineWidth=1.5;
-        ctx.strokeRect(nc*cw,nr*ch,cw,ch);
+        ctx.fillStyle='rgba(66,165,245,.18)';ctx.fillRect(nc*cw,nr*ch,cw,ch);
+        ctx.strokeStyle='rgba(66,165,245,.55)';ctx.lineWidth=1.5;ctx.strokeRect(nc*cw,nr*ch,cw,ch);
       }
-    });
-    S.dragGroup.forEach(p=>{
-      const px=S.dragX+(p.cC-anchor.cC)*cw;
-      const py=S.dragY+(p.cR-anchor.cR)*ch;
-      ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=14;ctx.shadowOffsetY=5;
-      ctx.fillStyle='rgba(0,0,0,.005)';ctx.fillRect(px,py,cw,ch);ctx.restore();
     });
   }
 }
+
+/* ===== LOGIC ===== */
 function integrityCheck(){
-  const n=S.gridN, occ=new Map();
+  const n=S.gridN;
+  const occ=new Map();
   S.pieces.forEach(p=>{
     const k=`${p.cR},${p.cC}`;
     if(!occ.has(k)) occ.set(k,[p]); else occ.get(k).push(p);
@@ -288,10 +295,10 @@ function integrityCheck(){
   occ.forEach((arr,k)=>{
     if(arr.length<=1) return;
     for(let i=1;i<arr.length;i++){
-      const p=arr[i]; let best=null,bestD=Infinity;
+      const p=arr[i];
+      let best=null,bestD=Infinity;
       for(let r=0;r<n;r++) for(let c=0;c<n;c++){
-        const cnt=S.pieces.filter(x=>x.cR===r&&x.cC===c).length;
-        if(cnt===0){
+        if(S.pieces.filter(x=>x.cR===r&&x.cC===c).length===0){
           const d=Math.abs(r-p.cR)+Math.abs(c-p.cC);
           if(d<bestD){bestD=d;best={r,c}}
         }
@@ -300,11 +307,13 @@ function integrityCheck(){
     }
   });
 }
+
 function getXY(e){
   const t=e.touches?e.touches[0]||e.changedTouches[0]:e;
   const rect=gc.getBoundingClientRect();
   return{x:t.clientX-rect.left,y:t.clientY-rect.top};
 }
+
 function onStart(e){
   e.preventDefault();
   if(S.solved) return;
@@ -318,6 +327,7 @@ function onStart(e){
   S.dragX=x-S.dragOX; S.dragY=y-S.dragOY;
   render();
 }
+
 function onMove(e){
   e.preventDefault();
   if(!S.drag) return;
@@ -325,6 +335,7 @@ function onMove(e){
   S.dragX=x-S.dragOX; S.dragY=y-S.dragOY;
   render();
 }
+
 function onEnd(e){
   e.preventDefault();
   if(!S.drag) return;
@@ -335,13 +346,12 @@ function onEnd(e){
   const minDC=Math.min(...deltas.map(d=>d.dc)), maxDC=Math.max(...deltas.map(d=>d.dc));
   tR=Math.max(-minDR,Math.min(n-1-maxDR,tR));
   tC=Math.max(-minDC,Math.min(n-1-maxDC,tC));
-  if(tR===anchor.cR&&tC===anchor.cC){ S.drag=null;S.dragGroup=[];render();return; }
+  if(tR===anchor.cR&&tC===anchor.cC){S.drag=null;S.dragGroup=[];render();return}
   const newPos=deltas.map(d=>({p:d.p,nR:tR+d.dr,nC:tC+d.dc}));
   const groupSet=new Set(group);
-  if(newPos.some(({nR,nC})=>{const t=pieceAt(nR,nC); return t&&t.locked&&!groupSet.has(t)})){
+  if(newPos.some(({nR,nC})=>{const t=pieceAt(nR,nC);return t&&t.locked&&!groupSet.has(t)})){
     S.drag=null;S.dragGroup=[];render();return;
   }
-  const groupOld=group.map(p=>({p,r:p.cR,c:p.cC}));
   const displaced=[];
   newPos.forEach(({nR,nC})=>{
     const t=pieceAt(nR,nC);
@@ -350,45 +360,51 @@ function onEnd(e){
   const posMap=new Map();
   newPos.forEach(({p,nR,nC})=>posMap.set(p,{r:nR,c:nC}));
   const targetSlotSet=new Set(newPos.map(({nR,nC})=>`${nR},${nC}`));
-  const vacated=groupOld.filter(o=>!targetSlotSet.has(`${o.r},${o.c}`)).map(o=>({r:o.r,c:o.c}));
+  const vacated=group.map(p=>({r:p.cR,c:p.cC})).filter(o=>!targetSlotSet.has(`${o.r},${o.c}`));
   displaced.forEach((dp,i)=>{
     if(i<vacated.length) posMap.set(dp,{r:vacated[i].r,c:vacated[i].c});
     else {
-      const allUsed=new Set();
-      S.pieces.forEach(p=>{
-        if(posMap.has(p)) allUsed.add(`${posMap.get(p).r},${posMap.get(p).c}`);
-        else if(p!==dp&&!displaced.includes(p)) allUsed.add(`${p.cR},${p.cC}`);
-      });
       for(let rr=0;rr<n;rr++) for(let cc=0;cc<n;cc++){
-        if(!allUsed.has(`${rr},${cc}`)){posMap.set(dp,{r:rr,c:cc});rr=n;break}
+        const isFree = !S.pieces.some(p=>(posMap.has(p)?posMap.get(p).r===rr&&posMap.get(p).c===cc : p!==dp&&p.cR===rr&&p.cC===cc));
+        if(isFree){posMap.set(dp,{r:rr,c:cc});rr=n;break}
       }
     }
   });
   posMap.forEach((pos,p)=>{p.cR=pos.r;p.cC=pos.c});
-  S.pieces.forEach(p=>{ if(!p.locked&&p.cR===p.oR&&p.cC===p.oC) p.locked=true });
-  integrityCheck(); S.drag=null; S.dragGroup=[]; render(); checkWin();
+  S.pieces.forEach(p=>{if(!p.locked&&p.cR===p.oR&&p.cC===p.oC) p.locked=true});
+  integrityCheck();
+  S.drag=null; S.dragGroup=[];
+  render();
+  checkWin();
 }
+
 function checkWin(){
   if(S.pieces.every(p=>p.locked)){
     S.solved=true; successEl.classList.add('show'); render(); fireConfetti();
-    S.autoTimer=setTimeout(()=>{ successEl.classList.remove('show'); goNext(); },3200);
+    S.autoTimer=setTimeout(()=>{successEl.classList.remove('show');goNext()},3200);
   }
 }
+
 function fireConfetti(){
-  const cv=document.createElement('canvas'); cv.className='confetti-cv'; document.body.appendChild(cv);
-  const x2=cv.getContext('2d'); cv.width=window.innerWidth; cv.height=window.innerHeight;
+  const cv=document.createElement('canvas');cv.className='confetti-cv';document.body.appendChild(cv);
+  const x2=cv.getContext('2d');cv.width=window.innerWidth;cv.height=window.innerHeight;
   const P=[], cols=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff6eb4','#a855f7','#f97316','#42a5f5'];
-  for(let i=0;i<160;i++) P.push({x:cv.width*.5+(Math.random()-.5)*cv.width*.6,y:cv.height*(-.05-Math.random()*.4),w:Math.random()*9+3,h:Math.random()*6+2,c:cols[Math.random()*cols.length|0],vx:(Math.random()-.5)*5,vy:Math.random()*3+1.5,rot:Math.random()*360,rv:(Math.random()-.5)*12,life:1});
+  for(let i=0;i<160;i++)P.push({x:cv.width*.5+(Math.random()-.5)*cv.width*.6,y:cv.height*(-.05-Math.random()*.4),w:Math.random()*9+3,h:Math.random()*6+2,c:cols[Math.random()*cols.length|0],vx:(Math.random()-.5)*5,vy:Math.random()*3+1.5,rot:Math.random()*360,rv:(Math.random()-.5)*12,life:1});
   let last=performance.now();
   (function tick(t){
-    const dt=Math.min((t-last)/1000,.05); last=t; x2.clearRect(0,0,cv.width,cv.height); let alive=false;
+    const dt=Math.min((t-last)/1000,.05);last=t;x2.clearRect(0,0,cv.width,cv.height);
+    let alive=false;
     P.forEach(p=>{
-      p.x+=p.vx; p.y+=p.vy; p.vy+=40*dt; p.rot+=p.rv; p.life-=dt*0.32;
-      if(p.life<=0)return; alive=true; x2.save(); x2.translate(p.x,p.y); x2.rotate(p.rot*Math.PI/180); x2.globalAlpha=Math.max(0,p.life); x2.fillStyle=p.c; x2.fillRect(-p.w/2,-p.h/2,p.w,p.h); x2.restore();
+      p.x+=p.vx;p.y+=p.vy;p.vy+=4*dt;p.rot+=p.rv;p.life-=dt*.32;
+      if(p.life<=0)return; alive=true;
+      x2.save();x2.translate(p.x,p.y);x2.rotate(p.rot*Math.PI/180);x2.globalAlpha=Math.max(0,p.life);
+      x2.fillStyle=p.c;x2.fillRect(-p.w/2,-p.h/2,p.w,p.h);x2.restore();
     });
     if(alive) requestAnimationFrame(tick); else cv.remove();
   })(last);
 }
+
+/* ===== FLOW ===== */
 async function loadLevel(levelIdx,useCustom){
   S.solved=false; successEl.classList.remove('show');
   if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
@@ -396,67 +412,48 @@ async function loadLevel(levelIdx,useCustom){
   lvlTxt.textContent=useCustom?'自定义关卡':`第 ${levelIdx+1} 关`;
   loadTip.textContent='加载中...'; loadTip.classList.add('show'); bShow.classList.add('gone');
   try{
-    if(useCustom&&S.customImg) S.img=S.customImg;
-    else S.img=await loadImg(LEVELS[levelIdx % LEVELS.length]);
+    S.img = useCustom && S.customImg ? S.customImg : await loadImg(LEVELS[levelIdx % LEVELS.length]);
     loadTip.classList.remove('show'); bShow.classList.remove('gone');
     S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
-    resize(); render(); if(!useCustom) schedulePreload();
+    resize(); render();
+    if(!useCustom) schedulePreload();
   }catch(err){
-    loadTip.textContent='加载失败，重试中...'; setTimeout(()=>loadLevel(levelIdx,useCustom),1500);
+    loadTip.textContent='加载失败，重试中...';
+    setTimeout(()=>loadLevel(levelIdx,useCustom),1500);
   }
 }
+
 function goNext(){
   S.prevShown=true; bPrev.classList.remove('gone');
-  const nextLvl=(S.level+1) % LEVELS.length;
-  S.customImg=null; loadLevel(nextLvl,false);
+  loadLevel(S.level+1, false);
 }
 function goPrev(){
-  if(S.level>0){ S.customImg=null; loadLevel(S.level-1,false); }
+  if(S.level>0) loadLevel(S.level-1, false);
 }
 
-/* ===== EVENT BINDINGS ===== */
+/* ===== BINDINGS ===== */
 gc.addEventListener('mousedown',onStart);
 gc.addEventListener('mousemove',onMove);
 gc.addEventListener('mouseup',onEnd);
-gc.addEventListener('mouseleave',e=>{if(S.drag)onEnd(e)});
 gc.addEventListener('touchstart',onStart,{passive:false});
 gc.addEventListener('touchmove',onMove,{passive:false});
 gc.addEventListener('touchend',onEnd,{passive:false});
-gc.addEventListener('touchcancel',onEnd,{passive:false});
 document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
-bNext.addEventListener('click',()=>{
-  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
-  successEl.classList.remove('show'); goNext();
-});
+bNext.addEventListener('click',()=>goNext());
 bPrev.addEventListener('click',()=>goPrev());
-bStart.addEventListener('click',()=>{
-  if(!S.img) return;
-  S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
-  S.solved=false; successEl.classList.remove('show');
-  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
-  resize();render();
-});
-sDiff.addEventListener('change',()=>{
-  if(!S.img) return;
-  S.gridN=parseInt(sDiff.value); S.pieces=makePieces(S.gridN);
-  S.solved=false; successEl.classList.remove('show');
-  if(S.autoTimer){clearTimeout(S.autoTimer);S.autoTimer=null}
-  resize();render();
-});
+bStart.addEventListener('click',()=>{S.gridN=parseInt(sDiff.value);S.pieces=makePieces(S.gridN);S.solved=false;resize();render()});
+sDiff.addEventListener('change',()=>{S.gridN=parseInt(sDiff.value);S.pieces=makePieces(S.gridN);S.solved=false;resize();render()});
 bShow.addEventListener('click',()=>{
   if(!S.img) return;
-  const tc=document.createElement('canvas'); tc.width=S.img.width; tc.height=S.img.height;
-  tc.getContext('2d').drawImage(S.img,0,0); ovImg.src=tc.toDataURL(); ov.classList.add('show');
+  const tc=document.createElement('canvas');tc.width=S.img.width;tc.height=S.img.height;
+  tc.getContext('2d').drawImage(S.img,0,0);ovImg.src=tc.toDataURL();ov.classList.add('show');
 });
 ovX.addEventListener('click',()=>ov.classList.remove('show'));
-ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('show')});
 bUpload.addEventListener('click',()=>fIn.click());
 fIn.addEventListener('change',e=>{
   const f=e.target.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=ev=>{
-    const im=new Image(); im.onload=()=>{ S.customImg=im; loadLevel(S.level,true); }; im.src=ev.target.result;
-  };
+  rd.onload=ev=>{const im=new Image();im.onload=()=>{S.customImg=im;loadLevel(S.level,true)};im.src=ev.target.result};
   rd.readAsDataURL(f); fIn.value='';
 });
 window.addEventListener('resize',()=>{resize();render()});
